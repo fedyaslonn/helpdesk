@@ -1,0 +1,19 @@
+[project]
+name = "help-desk"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "fed0r",email = "wisp47344@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "django (>=5.2,<6.0)",
+    "redis (>=6.0.0,<7.0.0)",
+    "psycopg2-binary (>=2.9.10,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
