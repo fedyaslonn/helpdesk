@@ -3,6 +3,11 @@
 import os
 import sys
 
+import logging
+
+logging.basicConfig(
+    level=logging.ERROR,
+)
 
 def main():
     """Run administrative tasks."""
