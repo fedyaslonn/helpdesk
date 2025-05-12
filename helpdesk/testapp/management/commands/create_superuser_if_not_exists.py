@@ -38,4 +38,3 @@ class Command(BaseCommand):
             except (ValidationError, IntegrityError) as e:
                 logger.error(f"Failed to create superuser: {str(e)}")
                 raise
-

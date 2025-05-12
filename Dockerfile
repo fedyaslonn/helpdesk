@@ -23,4 +23,3 @@ ENV PYTHONDONTWRITEBYTECODE=1
 EXPOSE 8000
 
 CMD ["sh", "/help_desk/entrypoint.sh"]
-
