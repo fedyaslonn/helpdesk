@@ -1,15 +1,15 @@
-from django.core.management.base import BaseCommand
-from django.contrib.auth import get_user_model
-
-from django.core.exceptions import ImproperlyConfigured
-from django.db import IntegrityError
-from django.core.exceptions import ValidationError
-
+import logging
 import os
+
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.core.management.base import BaseCommand
+from django.db import IntegrityError
 from dotenv import load_dotenv
+
 load_dotenv()
 
-import logging
+
 
 logger = logging.getLogger(__name__)
 
