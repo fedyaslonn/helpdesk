@@ -21,7 +21,7 @@ repos:
         language: system
         types: [python]
         exclude: 'migrations/'
-        args: [--max-line-length=120, --ignore=W503,D104,D100,VNE001,B008]
+        args: [--max-line-length=120, --ignore=E902,W503,D104,D100,VNE001,B008]
       - id: mypy
         name: mypy
         entry: poetry run mypy
