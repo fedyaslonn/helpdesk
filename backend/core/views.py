@@ -33,6 +33,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from django.db.models import Q
+
 logger = logging.getLogger(__name__)
 
 
@@ -597,17 +599,13 @@ class CommentViewSet(viewsets.ViewSet):
                 )
 
             try:
-                ticket = Ticket.objects.get(id=ticket_id)
+                ticket = Ticket.objects.get(
+                    Q(id=ticket_id) & (Q(requestor=user) | Q(assignee=user))
+                )
 
             except Ticket.DoesNotExist:
                 return Response(
-                    {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
-                )
-
-            if not self.has_permission_to_comment(user, ticket):
-                return Response(
-                    {"error": "Author must be assignee or requestor!"},
-                    status=status.HTTP_403_FORBIDDEN,
+                    {"error": "Ticket not found or comment's author not assignee or requestor"}, status=status.HTTP_403_FORBIDDEN
                 )
 
             comment = Comment.objects.create(
@@ -638,12 +636,6 @@ class CommentViewSet(viewsets.ViewSet):
 
         response = GetCommentSerializer(comment)
         return Response(response.data, status=status.HTTP_201_CREATED)
-
-    @staticmethod
-    def has_permission_to_comment(user, ticket):
-        return user.id == ticket.requestor.id or (
-            ticket.assignee is not None and user.id == ticket.assignee.id
-        )
 
     def update(self, request, pk=None):
         try:
