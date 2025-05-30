@@ -1,24 +1,23 @@
+from core.models import Comment
+from core.serializers.users_serializers import GetUserSerializer
 from django.core.validators import MinLengthValidator
 from rest_framework import serializers
 from rest_framework.serializers import ValidationError
 
-from core.models import Comment
-
 
 class CreateCommentSerializer(serializers.ModelSerializer):
+    author_id = serializers.IntegerField(required=True)
+    ticket_id = serializers.IntegerField(required=True)
+
     class Meta:
         model = Comment
-        fields = ["text"]
+        fields = ["text", "author_id", "ticket_id"]
 
 
 class GetCommentSerializer(serializers.ModelSerializer):
-    from core.serializers.users_serializers import GetUserSerializer
-
-    author = GetUserSerializer(read_only=True)
-
     class Meta:
         model = Comment
-        fields = ["id", "author", "text", "created_at", "is_responsed"]
+        fields = "__all__"
 
         extra_kwargs = {field: {"read_only": True} for field in fields}
 
@@ -32,7 +31,7 @@ class GetCommentSerializer(serializers.ModelSerializer):
 class UpdateCommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        fields = ["text", "is_responsed"]
+        fields = ["text"]
 
 
 class PartialUpdateCommentSerializer(serializers.ModelSerializer):
@@ -41,8 +40,7 @@ class PartialUpdateCommentSerializer(serializers.ModelSerializer):
         validators=[MinLengthValidator(2)],
         error_messages={"min_length": "Text field must have at least 2 characters"},
     )
-    is_responsed = serializers.BooleanField(required=False)
 
     class Meta:
         model = Comment
-        fields = ["text", "is_responsed"]
+        fields = ["text"]

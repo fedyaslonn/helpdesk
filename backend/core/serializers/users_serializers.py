@@ -1,55 +1,26 @@
 from datetime import date
 
+from core.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from core.models import User
-
-
-class SimpleUserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = [
-            "id",
-            "email",
-            "username",
-            "first_name",
-            "last_name",
-            "is_staff",
-            "is_active",
-            "date_joined",
-            "organizations",
-        ]
-
 
 class GetUserSerializer(serializers.ModelSerializer):
-    organizations = serializers.SerializerMethodField()
-
     class Meta:
         model = User
         fields = [
             "id",
-            "email",
-            "username",
+            "organization",
+            "last_login",
             "first_name",
             "last_name",
-            "is_staff",
-            "is_active",
-            "date_joined",
-            "organizations",
+            "email",
+            "username",
         ]
 
         extra_kwargs = {field: {"read_only": True} for field in fields}
-
-    def get_organizations(self, obj):
-        from core.serializers.organizations_serializers import (
-            SimpleOrganizationSerializer,
-        )
-
-        organizations = obj.organizations.all()
-        return SimpleOrganizationSerializer(organizations, many=True).data
 
 
 class CreateUserSerializer(serializers.ModelSerializer):
@@ -90,7 +61,13 @@ class CreateUserSerializer(serializers.ModelSerializer):
 class UpdateUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["email", "username", "first_name", "last_name", "date_birth"]
+        fields = [
+            "email",
+            "username",
+            "first_name",
+            "last_name",
+            "date_birth",
+        ]
 
     def validate_date_birth(self, value):
         if value > timezone.now():

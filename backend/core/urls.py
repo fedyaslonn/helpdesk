@@ -1,33 +1,36 @@
-from core.views import CommentViewSet, OrganizationViewSet, TicketViewSet, UserViewSet
+from core.views.comments_viewset import CommentsViewSet
+from core.views.organizations_viewset import OrganizationsViewSet
+from core.views.tickets_viewset import TicketsViewSet
+from core.views.users_viewset import UsersViewSet
 from django.urls import path
 
-user_list = UserViewSet.as_view({"get": "list", "post": "create"})
+user_list = UsersViewSet.as_view({"get": "list", "post": "create"})
 
-user_detail = UserViewSet.as_view(
+user_detail = UsersViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
 
-user_update_password = UserViewSet.as_view({"post": "update_password"})
+user_update_password = UsersViewSet.as_view({"post": "update_password"})
 
-user_set_organization = UserViewSet.as_view({"post": "set_organization"})
+user_set_organization = UsersViewSet.as_view({"post": "set_organization"})
 
-user_leave_organization = UserViewSet.as_view({"post": "leave_organization"})
+user_leave_organization = UsersViewSet.as_view({"post": "leave_organization"})
 
-organization_list = OrganizationViewSet.as_view({"get": "list", "post": "create"})
+organization_list = OrganizationsViewSet.as_view({"get": "list", "post": "create"})
 
-organization_detail = OrganizationViewSet.as_view(
+organization_detail = OrganizationsViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
 
-comment_list = CommentViewSet.as_view({"get": "list", "post": "create"})
+comment_creation = CommentsViewSet.as_view({"post": "create"})
 
-comment_detail = CommentViewSet.as_view(
+comment_detail = CommentsViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
 
-ticket_list = TicketViewSet.as_view({"get": "list", "post": "create"})
+ticket_list = TicketsViewSet.as_view({"get": "list", "post": "create"})
 
-ticket_detail = TicketViewSet.as_view(
+ticket_detail = TicketsViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
 
@@ -53,7 +56,7 @@ urlpatterns = [
         "organizations/organizations_list/", organization_list, name="organization-list"
     ),
     path("organizations/<int:pk>/", organization_detail, name="organization-detail"),
-    path("comments/comments_list/", comment_list, name="comment-list"),
+    path("comments/comments_creation/", comment_creation, name="comment-creation"),
     path("comments/<int:pk>/", comment_detail, name="comment-detail"),
     path("tickets/tickets_list/", ticket_list, name="ticket-list"),
     path("tickets/<int:pk>/", ticket_detail, name="ticket-detail"),

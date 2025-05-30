@@ -6,6 +6,38 @@ from django.utils.translation import gettext_lazy as _
 # Create your models here.
 
 
+class TimestampedModel(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+
+class Organization(TimestampedModel):
+    name = models.CharField(
+        max_length=52,
+        validators=[MinLengthValidator(2)],
+        error_messages={"min_length": "Name must have at least 2 characters"},
+    )
+    email = models.EmailField(
+        max_length=52,
+        unique=True,
+        error_messages={"unique": "This email is already taken."},
+    )
+    is_active = models.BooleanField(
+        default=True, help_text=_("Whether the organization is active")
+    )
+
+    class Meta:
+        verbose_name = _("Organization model")
+        verbose_name_plural = _("Organizations")
+        db_table = "Organizations"
+
+    def __str__(self):
+        return f"{self.name}"
+
+
 class User(AbstractUser):
     email = models.EmailField(
         max_length=52,
@@ -21,6 +53,13 @@ class User(AbstractUser):
             "min_length": "Username must have at least 3 characters",
         },
     )
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="members",
+        null=True,
+        blank=True,
+    )
     date_birth = models.DateField(auto_now_add=False, null=True, blank=True)
 
     USERNAME_FIELD = "username"
@@ -35,50 +74,12 @@ class User(AbstractUser):
         return f"{self.get_full_name()}"
 
 
-class Organization(models.Model):
-    name = models.CharField(
-        max_length=52,
-        validators=[MinLengthValidator(2)],
-        error_messages={"min_length": "Name must have at least 2 characters"},
-    )
-    email = models.EmailField(
-        max_length=52,
-        unique=True,
-        error_messages={"unique": "This email is already taken."},
-    )
-    members = models.ManyToManyField(User, through="OrganizationMember", related_name="organizations")  # type: ignore
-    is_active = models.BooleanField(
-        default=True, help_text=_("Whether the organization is active")
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        verbose_name = _("Organization model")
-        verbose_name_plural = _("Organizations")
-        db_table = "Organizations"
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"{self.name}"
-
-
-class OrganizationMember(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    date_joined = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ("user", "organization")
-        verbose_name = _("OrganizationMember")
-        verbose_name_plural = _("OrganizationMembers")
-        db_table = "OrganizationMember"
-
-
-class Ticket(models.Model):
+class Ticket(TimestampedModel):
     class Status(models.TextChoices):
         OPEN = "OP", _("Open")
         IN_PROGRESS = "IP", _("In Progress")
         RESOLVED = "RS", _("Resolved")
+        WAITING_FOR_ASSIGNEE = "WA", _("WA")
 
     requestor = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="requested_tickets"
@@ -109,8 +110,6 @@ class Ticket(models.Model):
         choices=Status.choices,
         default=Status.OPEN,
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = _("Ticket")
@@ -121,7 +120,7 @@ class Ticket(models.Model):
         return f"Ticket {self.id} - {self.title}"
 
 
-class Comment(models.Model):
+class Comment(TimestampedModel):
     ticket = models.ForeignKey(
         Ticket, on_delete=models.CASCADE, related_name="comments"
     )
@@ -129,11 +128,6 @@ class Comment(models.Model):
     text = models.TextField(
         validators=[MinLengthValidator(2)],
         error_messages={"min_length": "Text field must have at least 2 characters"},
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    is_responsed = models.BooleanField(
-        default=False, help_text=_("Whether response is received")
     )
 
     class Meta:
