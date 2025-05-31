@@ -1,5 +1,5 @@
 from core.models import Comment
-from core.serializers.users_serializers import GetUserSerializer
+from core.serializers.users import GetUserSerializer
 
 from django.core.validators import MinLengthValidator
 from rest_framework import serializers

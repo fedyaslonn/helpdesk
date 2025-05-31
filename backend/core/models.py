@@ -79,7 +79,7 @@ class Ticket(TimestampedModel):
         OPEN = "OP", _("Open")
         IN_PROGRESS = "IP", _("In Progress")
         RESOLVED = "RS", _("Resolved")
-        WAITING_FOR_ASSIGNEE = "WA", _("WA")
+        WAITING_FOR_REQUESTOR = "WR", _("WR")
 
     requestor = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="requested_tickets"

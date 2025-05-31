@@ -1,7 +1,7 @@
 from core.models import Organization, Ticket, User
-from core.serializers.comments_serializers import GetCommentSerializer
-from core.serializers.organizations_serializers import GetOrganizationSerializer
-from core.serializers.users_serializers import GetUserSerializer
+from core.serializers.comments import GetCommentSerializer
+from core.serializers.organizations import GetOrganizationSerializer
+from core.serializers.users import GetUserSerializer
 
 from django.core.validators import MinLengthValidator
 from rest_framework import serializers
