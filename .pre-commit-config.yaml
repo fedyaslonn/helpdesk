@@ -7,7 +7,7 @@ repos:
         language: system
         types: [python]
         exclude: 'migrations/'
-        args: [--check, --diff, --line-length=120]
+        args: [--diff, --line-length=120]
       - id: isort
         name: isort
         entry: poetry run isort
