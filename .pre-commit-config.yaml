@@ -7,21 +7,19 @@ repos:
         language: system
         types: [python]
         exclude: 'migrations/'
-        args: [--diff, --line-length=120]
+        args: [--check, --diff, --line-length=120]
       - id: isort
         name: isort
         entry: poetry run isort
         language: system
         types: [python]
         exclude: 'migrations/'
-        args: [--profile=black, --line-length=120, --known-first-party=core, --lines_between_sections=1]
       - id: flake8
         name: flake8
         entry: poetry run flake8
         language: system
         types: [python]
         exclude: 'migrations/'
-        args: [--max-line-length=120, --ignore=E902,W503,D104,D100,VNE001,B008]
       - id: mypy
         name: mypy
         entry: poetry run mypy
