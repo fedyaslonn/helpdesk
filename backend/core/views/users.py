@@ -9,7 +9,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from core.models import Comment, Organization, Ticket, User
-from core.serializers.users_serializers import (
+from core.serializers.users import (
     CreateUserSerializer,
     GetUserSerializer,
     PartialUpdateUserSerializer,

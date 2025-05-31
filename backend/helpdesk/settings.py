@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "testapp",
     "core",
     "rest_framework",
+    "corsheaders",
 ]
 
 MIDDLEWARE = [
@@ -61,6 +62,10 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "helpdesk.wsgi.application"
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+]
 
 
 # Database
