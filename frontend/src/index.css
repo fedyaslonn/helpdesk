@@ -1,0 +1,241 @@
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}
+
+.users-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.users-table {
+  width: 100%;
+}
+
+.user-row {
+  display: table;
+  width: 100%;
+  border: 1px solid #ddd;
+  padding: 10px;
+  margin-bottom: 5px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.avatar {
+  background: #ccc;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  font-weight: bold;
+  color: white;
+}
+
+.username {
+  font-size: 16px;
+  color: white;
+}
+
+.email {
+  color: white;
+  font-size: 14px;
+}
+
+.organizations {
+  margin-top: 5px;
+}
+
+.org-tag {
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  margin-right: 5px;
+}
+
+.no-org {
+  color: grey;
+  font-style: italic;
+}
+
+.create-user-container {
+  max-width: 400px;
+  margin: 20px auto;
+  padding: 20px;
+  background: black;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: #555;
+}
+
+button {
+  width: 100%;
+  padding: 10px;
+  background: purple;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.organizations-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-title {
+  font-size: 24px;
+  color: #333;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #666;
+  padding-bottom: 5px;
+}
+
+.organizations-table {
+  width: 100%;
+}
+
+.organization-row {
+  display: table;
+  width: 100%;
+  border: 1px solid #ddd;
+  padding: 10px;
+  margin-bottom: 5px;
+}
+
+.org-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.org-name {
+  font-size: 16px;
+  color: white;
+  margin-right: 20px;
+}
+
+.org-email {
+  color: #666;
+  font-size: 14px;
+}
+
+.org-status {
+  margin: 10px 0;
+}
+
+.status-active {
+  color: #4CAF50;
+  font-weight: bold;
+}
+
+.status-inactive {
+  color: #f44336;
+  font-weight: bold;
+}
+
+.org-members {
+  margin-top: 10px;
+  padding-left: 20px;
+}
+
+
+.error-message {
+  color: #ff4444;
+  padding: 20px;
+  text-align: center;
+}
+
+.loading {
+  padding: 20px;
+  text-align: center;
+}
+
+.no-data {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+}
