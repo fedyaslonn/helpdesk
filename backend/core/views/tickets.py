@@ -1,11 +1,5 @@
 import logging
 
-from django.db import DatabaseError, IntegrityError
-from django.db.models import ObjectDoesNotExist, Prefetch, Q
-from rest_framework import status, viewsets
-from rest_framework.exceptions import ValidationError
-from rest_framework.response import Response
-
 from core.models import Comment, Organization, Ticket, User
 from core.serializers.tickets import (
     CreateTicketSerializer,
@@ -13,6 +7,12 @@ from core.serializers.tickets import (
     PartialUpdateTicketSerializer,
     UpdateTicketSerializer,
 )
+
+from django.db import DatabaseError, IntegrityError
+from django.db.models import ObjectDoesNotExist, Prefetch, Q
+from rest_framework import status, viewsets
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 
 logger = logging.getLogger(__name__)
 

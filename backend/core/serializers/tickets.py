@@ -1,10 +1,10 @@
-from django.core.validators import MinLengthValidator
-from rest_framework import serializers
-
 from core.models import Organization, Ticket, User
 from core.serializers.comments_serializers import GetCommentSerializer
 from core.serializers.organizations_serializers import GetOrganizationSerializer
 from core.serializers.users_serializers import GetUserSerializer
+
+from django.core.validators import MinLengthValidator
+from rest_framework import serializers
 
 
 class SimpleTicketSerializer(serializers.ModelSerializer):

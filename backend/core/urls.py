@@ -1,9 +1,9 @@
-from django.urls import path
-
 from core.views.comments import CommentsViewSet
 from core.views.organizations import OrganizationsViewSet
 from core.views.tickets import TicketsViewSet
 from core.views.users import UsersViewSet
+
+from django.urls import path
 
 user_list = UsersViewSet.as_view({"get": "list", "post": "create"})
 
