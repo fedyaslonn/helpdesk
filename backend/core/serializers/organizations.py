@@ -1,8 +1,8 @@
-from core.models import Organization
-from core.serializers.users import GetUserSerializer
-
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
+
+from core.models import Organization
+from core.serializers.users import GetUserSerializer
 
 
 class CreateOrganizationSerializer(serializers.ModelSerializer):

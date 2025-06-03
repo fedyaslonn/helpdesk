@@ -1,10 +1,10 @@
+from django.core.validators import MinLengthValidator
+from rest_framework import serializers
+
 from core.models import Organization, Ticket, User
 from core.serializers.comments import GetCommentSerializer
 from core.serializers.organizations import GetOrganizationSerializer
 from core.serializers.users import GetUserSerializer
-
-from django.core.validators import MinLengthValidator
-from rest_framework import serializers
 
 
 class SimpleTicketSerializer(serializers.ModelSerializer):
@@ -70,7 +70,7 @@ class GetTicketSerializer(serializers.ModelSerializer):
 
 class UpdateTicketSerializer(serializers.ModelSerializer):
     assignee = serializers.IntegerField(required=False, allow_null=True)
-    organization = serializers.IntegerField(read_only=True)
+    organization = serializers.IntegerField()
 
     description = serializers.CharField(
         required=True,

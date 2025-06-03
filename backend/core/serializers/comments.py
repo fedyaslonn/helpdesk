@@ -1,9 +1,9 @@
-from core.models import Comment
-from core.serializers.users import GetUserSerializer
-
 from django.core.validators import MinLengthValidator
 from rest_framework import serializers
 from rest_framework.serializers import ValidationError
+
+from core.models import Comment
+from core.serializers.users import GetUserSerializer
 
 
 class CreateCommentSerializer(serializers.ModelSerializer):

@@ -1,11 +1,11 @@
 from datetime import date
 
-from core.models import User
-
 from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
+
+from core.models import User
 
 
 class GetUserSerializer(serializers.ModelSerializer):

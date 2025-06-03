@@ -1,5 +1,11 @@
 import logging
 
+from django.db import DatabaseError, IntegrityError
+from django.db.models import ObjectDoesNotExist, Prefetch, Q
+from rest_framework import status, viewsets
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
+
 from core.models import Comment, Organization, Ticket, User
 from core.serializers.tickets import (
     CreateTicketSerializer,
@@ -7,12 +13,6 @@ from core.serializers.tickets import (
     PartialUpdateTicketSerializer,
     UpdateTicketSerializer,
 )
-
-from django.db import DatabaseError, IntegrityError
-from django.db.models import ObjectDoesNotExist, Prefetch, Q
-from rest_framework import status, viewsets
-from rest_framework.exceptions import ValidationError
-from rest_framework.response import Response
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class TicketsViewSet(viewsets.ViewSet):
         try:
             requestor_id = validated_data.get("requestor")
             organization_id = validated_data.get("organization")
-            assignee_id = validated_data.get("assignee", "")
+            assignee_id = validated_data.get("assignee")
 
             if not requestor_id or not organization_id:
                 return Response(
@@ -149,7 +149,7 @@ class TicketsViewSet(viewsets.ViewSet):
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            assignee_id = validated_data.get("assignee", "")
+            assignee_id = validated_data.get("assignee")
 
             try:
                 organization_id = validated_data.get("organization")

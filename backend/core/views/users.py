@@ -1,13 +1,5 @@
 import logging
 
-from core.models import Comment, Organization, Ticket, User
-from core.serializers.users import (
-    CreateUserSerializer,
-    GetUserSerializer,
-    PartialUpdateUserSerializer,
-    UpdateUserSerializer,
-)
-
 from django.contrib.auth.hashers import check_password
 from django.db import DatabaseError, IntegrityError
 from django.db.models import ObjectDoesNotExist, Prefetch, Q
@@ -15,6 +7,14 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+
+from core.models import Comment, Organization, Ticket, User
+from core.serializers.users import (
+    CreateUserSerializer,
+    GetUserSerializer,
+    PartialUpdateUserSerializer,
+    UpdateUserSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -104,11 +104,16 @@ class UsersViewSet(viewsets.ViewSet):
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            user.email = validated_data.get("email")
-            user.username = validated_data.get("username")
-            user.first_name = validated_data.get("first_name")
-            user.last_name = validated_data.get("last_name")
-            user.date_birth = validated_data.get("date_birth")
+            if "email" in validated_data:
+                user.email = validated_data.get("email")
+            if "username" in validated_data:
+                user.username = validated_data.get("username")
+            if "first_name" in validated_data:
+                user.first_name = validated_data.get("first_name")
+            if "last_name" in validated_data:
+                user.last_name = validated_data.get("last_name")
+            if "date_birth" in validated_data:
+                user.date_birth = validated_data.get("date_birth")
 
             user.save()
 
