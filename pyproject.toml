@@ -36,7 +36,7 @@ known_first_party = ["core"]
 sections = [
     "FUTURE",
     "STDLIB",
-    "FIRSTPARTY",
     "THIRDPARTY",
+    "FIRSTPARTY",
     "LOCALFOLDER"
 ]
