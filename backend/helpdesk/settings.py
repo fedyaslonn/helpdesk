@@ -65,7 +65,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "helpdesk.wsgi.application"
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
+    os.getenv("CORS_HOST"),
 ]
 
 
