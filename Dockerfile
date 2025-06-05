@@ -10,10 +10,10 @@ RUN pip install poetry && \
 
 COPY . .
 
-WORKDIR /help_desk/helpdesk
+WORKDIR /help_desk/backend
 
 RUN chmod +x /help_desk/entrypoint.sh && \
-        chmod +x /help_desk/helpdesk/testapp/management/commands/create_superuser_if_not_exists.py
+        chmod +x /help_desk/backend/testapp/management/commands/create_superuser_if_not_exists.py
 
 
 ENV PYTHONFAULTHANDLER=1

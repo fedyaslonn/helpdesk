@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -18,13 +17,17 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         User = get_user_model()
 
-        username = os.environ.get('DJANGO_SUPERUSER_USERNAME')
-        email = os.environ.get('DJANGO_SUPERUSER_EMAIL')
-        password = os.environ.get('DJANGO_SUPERUSER_PASSWORD')
+        username = os.environ.get("DJANGO_SUPERUSER_USERNAME")
+        email = os.environ.get("DJANGO_SUPERUSER_EMAIL")
+        password = os.environ.get("DJANGO_SUPERUSER_PASSWORD")
 
         if not all([username, email, password]):
-            logging.error("User did not did not provides superuser's credentials! Failed attempt to create superuser!")
-            raise ImproperlyConfigured("User did not did not provides superuser's credentials!")
+            logging.error(
+                "User did not did not provides superuser's credentials! Failed attempt to create superuser!"
+            )
+            raise ImproperlyConfigured(
+                "User did not did not provides superuser's credentials!"
+            )
 
         if User.objects.filter(username=username).exists():
             logging.error("Superuser already exists!")
@@ -32,7 +35,9 @@ class Command(BaseCommand):
 
         else:
             try:
-                User.objects.create_superuser(username=username, email=email, password=password)
+                User.objects.create_superuser(
+                    username=username, email=email, password=password
+                )
                 logging.info("Superuser created successfully!")
 
             except (ValidationError, IntegrityError) as e:
