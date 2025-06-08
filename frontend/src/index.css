@@ -3,7 +3,6 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
   background-color: #242424;
 
@@ -24,7 +23,6 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
@@ -77,13 +75,6 @@ button:focus-visible {
   width: 100%;
 }
 
-.user-row {
-  display: table;
-  width: 100%;
-  border: 1px solid #ddd;
-  padding: 10px;
-  margin-bottom: 5px;
-}
 
 .user-info {
   display: flex;
@@ -103,15 +94,6 @@ button:focus-visible {
   color: white;
 }
 
-.username {
-  font-size: 16px;
-  color: white;
-}
-
-.email {
-  color: white;
-  font-size: 14px;
-}
 
 .organizations {
   margin-top: 5px;
@@ -133,7 +115,6 @@ button:focus-visible {
   max-width: 400px;
   margin: 20px auto;
   padding: 20px;
-  background: black;
   border-radius: 8px;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
@@ -193,15 +174,9 @@ button {
 }
 
 .org-name {
-  font-size: 16px;
-  color: white;
   margin-right: 20px;
 }
 
-.org-email {
-  color: #666;
-  font-size: 14px;
-}
 
 .org-status {
   margin: 10px 0;

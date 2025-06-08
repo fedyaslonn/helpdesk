@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import axios from "axios"
+import '../styles/UsersList.css'
 
 const api = axios.create({
   baseURL: "http://localhost:8000/",
@@ -40,34 +41,29 @@ function UsersList() {
       <h1 className="page-title">Users list</h1>
 
       <div className="users-table">
-
         {users.map((user) => (
           <div key={user.id} className="user-row">
             <div className="user-info">
-              <div className="avatar">
-                {user.username[0].toUpperCase()}
-              </div>
-              <div className="username">{user.username}</div>
+              <div className="avatar">{user.username ? user.username[0].toUpperCase() : "?"}</div>
+              <div className="username">{user.username || "Unknown User"}</div>
             </div>
 
-            <div className="email">{user.email}</div>
+            <div className="email">{user.email || "No email provided"}</div>
 
             <div className="organizations">
-              {user.organizations?.length > 0 ? (
-                user.organizations.map((org) => (
-                  <span key={org.id} className="org-tag">
-                    {org.name}
-                  </span>
-                ))
+              <p>Organization</p>
+              {user.organization ? (
+                <span className="org-tag">{user.organization.name}</span>
               ) : (
-                <span className="no-org">No organizations</span>
+                <span className="no-org">No organization</span>
               )}
             </div>
           </div>
         ))}
       </div>
     </div>
-  );
+  )
 }
+
 
 export default UsersList
