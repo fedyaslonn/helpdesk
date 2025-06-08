@@ -52,7 +52,7 @@ class OrganizationsViewSet(viewsets.ViewSet):
             )
 
             organization.save()
-            organization.objects.prefetch_related("members")
+            organization = Organization.objects.prefetch_related("members").get(pk=organization.id)
 
         except ValidationError as e:
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)

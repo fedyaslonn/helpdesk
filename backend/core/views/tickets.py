@@ -102,7 +102,7 @@ class TicketsViewSet(viewsets.ViewSet):
             ticket.save()
             ticket = Ticket.objects.select_related(
                 "requestor", "assignee", "organization"
-            )
+            ).get(id=ticket.id)
 
         except ValidationError as e:
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
