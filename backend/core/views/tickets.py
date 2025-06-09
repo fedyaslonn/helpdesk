@@ -2,26 +2,35 @@ import logging
 
 from django.db import DatabaseError, IntegrityError
 from django.db.models import ObjectDoesNotExist, Prefetch, Q
+from django_filters.rest_framework import DjangoFilterBackend
+from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from rest_framework.decorators import action
+from rest_framework.settings import api_settings
+from django.shortcuts import get_object_or_404
 
 from core.models import Comment, Organization, Ticket, User
 from core.serializers.tickets import (
     CreateTicketSerializer,
     GetTicketSerializer,
     PartialUpdateTicketSerializer,
-    UpdateTicketSerializer,
+    UpdateTicketSerializer
 )
+from core.filters.tickets import TicketFilter
 
 logger = logging.getLogger(__name__)
 
 
 class TicketsViewSet(viewsets.ViewSet):
+    filter_backends = (DjangoFilterBackend, )
+    filterset_class = TicketFilter
+
     def list(self, request):
-        queryset = Ticket.objects.select_related(
-            "requestor", "assignee", "organization"
-        ).all()
+        queryset = self.get_queryset()
+        queryset = self.filter_queryset(queryset)
+
         serializer = GetTicketSerializer(queryset, many=True)
 
         return Response(serializer.data)
@@ -296,3 +305,16 @@ class TicketsViewSet(viewsets.ViewSet):
                 {"error": f"Failed to delete ticket {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_authenticated:
+            return Ticket.objects.filter(organization=user.organization).select_related("requestor", "assignee", "organization")
+
+        return Ticket.objects.none()
+
+    def filter_queryset(self, queryset):
+        for backend in self.filter_backends:
+            queryset = backend().filter_queryset(self.request, queryset, self)
+
+        return queryset
