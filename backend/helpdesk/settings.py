@@ -141,8 +141,8 @@ CSRF_TRUSTED_ORIGINS = [
 
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": int(os.getenv('ACCESS_TOKEN_LIFETIME')),     # type: ignore
-    "REFRESH_TOKEN_LIFETIME": int(os.getenv('REFRESH_TOKEN_LIFETIME')),   # type: ignore
+    "ACCESS_TOKEN_LIFETIME": timedelta(seconds=int(os.getenv('ACCESS_TOKEN_LIFETIME'))),     # type: ignore
+    "REFRESH_TOKEN_LIFETIME": timedelta(seconds=int(os.getenv('REFRESH_TOKEN_LIFETIME'))),   # type: ignore
     "ROTATE_REFRESH_TOKENS": False,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
