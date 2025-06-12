@@ -277,8 +277,12 @@ body {
 .ticket-description {
   font-size: 0.875rem;
   color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin-bottom: 1rem;
   flex: 1;
+  max-width: 300px;
+  overflow: hidden;
 }
 
 .ticket-meta {
