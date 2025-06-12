@@ -69,7 +69,7 @@ class UsersViewSet(viewsets.ViewSet):
 
             response_data["tokens"] = {
                 "access": str(refresh.access_token),
-                "refresh": str(refresh)
+                "refresh": str(refresh),
             }
 
         except ValidationError as e:
