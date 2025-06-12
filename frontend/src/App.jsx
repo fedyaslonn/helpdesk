@@ -1,18 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './auth/AuthContext';
-import Layout from './components/Layout/Layout.jsx';
-import ProtectedRoute from './components/ProtectedRoute';
+import { useAuth, AuthContext, AuthProvider, LoginForm, LogOutButton } from './auth';
 
-import UsersList from './components/UsersList';
-import UserCreate from './components/UserCreation';
-import UserUpdate from './components/UserUpdate';
-import OrganizationsList from './components/OrganizationsList';
-import CreateOrganization from './components/OrganizationCreation';
-import CreateComment from './components/CommentCreation';
-import LoginForm from './auth/LoginForm';
-import LogoutButton from './auth/Logout';
-import TicketsPage from './components/TicketsList';
-import TicketCreateForm from './components/TicketCreation';
+import { UsersList, UserCreate, UserUpdate, TicketsPage, OrganizationsList, CreateOrganization, TicketCreateForm, ProtectedRoute, CreateComment } from './components'
+import Layout from './components/Layout/Layout.jsx';
+
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -32,7 +23,7 @@ function App() {
             <Route path="helpdesk">
               <Route path="tickets">
                 <Route index element={<TicketsPage />} />
-                <Route path="create" element={<TicketCreateForm />} />
+                <Route path="helpdesk/tickets/create" element={<TicketCreateForm />} />
               </Route>
             </Route>
 

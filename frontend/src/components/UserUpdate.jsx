@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react"
 import axios from "axios"
 import { useParams, useNavigate } from "react-router-dom"
+import { getUserById, updateUser } from '../services/user-management-api'
+
+import { serverApi } from '../contants'
 
 function UserUpdate() {
   const { id } = useParams()
@@ -17,7 +20,7 @@ function UserUpdate() {
   })
 
   useEffect(() => {
-    axios.get(`http://localhost:8000/helpdesk/users/${id}/`)
+    getUserById(id)
       .then(response => {
         setFormData({
           email: response.data.email,
@@ -43,13 +46,13 @@ function UserUpdate() {
   const handleSubmit = (e) => {
     e.preventDefault()
 
-    axios.patch(`http://localhost:8000/helpdesk/users/${id}/`, formData)
+    updateUser(id, formData)
       .then(() => {
         alert("User updated!")
         navigate("/users")
       })
       .catch(err => {
-        setError("Error: " + err.message)
+        setError("Error: " + err.message);
       })
   }
 

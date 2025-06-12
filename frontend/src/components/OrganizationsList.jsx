@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react"
 import axios from "axios"
 import '../styles/OrganizationsList.css'
+import { serverApi } from '../contants'
+import { getOrganizations } from '../services/organization-management-api'
 
 const api = axios.create({
-  baseURL: "http://localhost:8000/",
+  baseURL: `${serverApi}`,
   headers: { "Content-Type": "application/json" },
 })
 
@@ -15,17 +17,16 @@ function OrganizationsList() {
   useEffect(() => {
     const fetchOrganizations = () => {
       setIsLoading(true)
-      api
-        .get("helpdesk/organizations/organizations_list/")
+      getOrganizations()
         .then(({ data }) => {
           setOrganizations(data)
-          setError(null)
+          setError(null);
         })
         .catch(() => {
-          setError("Failed to load organizations")
+          setError("Failed to load organizations");
         })
         .finally(() => {
-          setIsLoading(false)
+          setIsLoading(false);
         })
     }
 
