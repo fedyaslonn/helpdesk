@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import LogoutButton from '../../auth/Logout'
+import { LogOutButton } from '../../auth/'
 
 const Header = () => {
   return (
@@ -11,8 +11,8 @@ const Header = () => {
         <nav className="main-nav">
           <Link to="/helpdesk/tickets">Tickets</Link>
           <Link to="/users">Users</Link>
-          <Link to="/organizations">Organizations</Link>
-          <LogoutButton />
+          <Link to="/helpdesk/organizations">Organizations</Link>
+          <LogOutButton />
         </nav>
       </div>
     </header>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth'
 import { useNavigate } from 'react-router-dom'
-import axios from "axios"
+import { getOrganizations, getUsers, createTicket } from '../services/ticket-management-api'
 import '../styles/TicketsPage.css'
+import { serverApi } from '../contants'
 
 const TicketCreateForm = () => {
   const { user } = useAuth();
@@ -23,10 +24,10 @@ const TicketCreateForm = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const orgsResponse = await axios.get('http://localhost:8000/helpdesk/organizations/organizations_list/')
+        const orgsResponse = await getOrganizations()
         setOrganizations(orgsResponse.data);
 
-        const usersResponse = await axios.get('http://localhost:8000/helpdesk/users/users_list/')
+        const usersResponse = await getUsers()
         setUsers(usersResponse.data);
 
         setIsLoading(false);
@@ -58,7 +59,7 @@ const TicketCreateForm = () => {
         assignee: formData.assignee ? parseInt(formData.assignee) : null,
         organization: parseInt(formData.organization)
       };
-      await axios.post('http://localhost:8000/helpdesk/tickets/create/', ticketData)
+            await createTicket(ticketData)
       navigate('/helpdesk/tickets')
     } catch (err) {
       setError('Failed to create ticket')
@@ -66,7 +67,7 @@ const TicketCreateForm = () => {
     } finally {
       setIsSubmitting(false)
     }
-  };
+  }
 
   const getStatusLabel = (status) => {
     const statusMap = {

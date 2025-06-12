@@ -1,9 +1,11 @@
 import axios from 'axios'
+import { serverApi } from '../contants'
 
-const API_BASE_URL = 'http://localhost:8000/authentication'
+
+console.log('serverApi:', serverApi);
 
 const apiClientInstance = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${serverApi}/authentication/`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -37,7 +39,7 @@ apiClientInstance.interceptors.response.use(
         if (!refreshToken) throw new Error('No refresh token available')
 
         const response = await axios.post(
-          `${API_BASE_URL}/api/token/refresh/`,
+          `${serverApi}/api/token/refresh/`,
           { refresh: refreshToken }
         );
 

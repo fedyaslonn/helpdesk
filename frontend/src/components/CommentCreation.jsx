@@ -1,5 +1,6 @@
 import { useState } from "react"
 import axios from "axios"
+import { serverApi } from '../contants'
 
 function CreateComment() {
   const [text, setText] = useState("")
@@ -10,7 +11,7 @@ function CreateComment() {
     e.preventDefault()
     setError("")
     axios
-      .post("http://localhost:8000/comments/comments_list/", { text, author_id: authorId })
+      .post(`${serverApi}/comments/comments_list/`, { text, author_id: authorId })
       .then(() => {
         alert("Comment created successfully!")
         setText("")

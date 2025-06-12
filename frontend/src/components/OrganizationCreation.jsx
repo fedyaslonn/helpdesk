@@ -1,5 +1,8 @@
 import { useState } from "react"
 import axios from "axios"
+import { serverApi } from '../contants'
+import { createOrganization } from '../services/organization-management-api';
+
 
 function CreateOrganization() {
   const [name, setName] = useState("")
@@ -7,17 +10,17 @@ function CreateOrganization() {
   const [error, setError] = useState("")
 
   const handleSubmit = (e) => {
-    e.preventDefault()
+    e.preventDefault();
     setError("")
 
-    axios.post("http://localhost:8000/organizations/organizations_list/", {email, name})
+    createOrganization({ email, name })
       .then(() => {
         alert("Organization created successfully!")
         setName("")
         setEmail("")
       })
       .catch(err => {
-        const errorMessage = err.response?.data?.error || "Something went wrong";
+        const errorMessage = err.response?.data?.error || "Something went wrong"
         setError(errorMessage)
       })
   }

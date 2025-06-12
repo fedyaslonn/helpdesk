@@ -1,58 +1,61 @@
-import { useState } from "react"
-import axios from "axios"
-import { useAuth } from "../auth/AuthContext.jsx"
-import { useNavigate } from "react-router-dom"
+import React, { useReducer } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { serverApi } from '../contants'
+import { useAuth } from '../auth/AuthContext';
 import '../styles/SignUpPage.css'
+import { createUser } from '../services/user-management-api';
+
+const formReducer = (state, action) => {
+  return {
+    ...state,
+    [action.field]: action.value,
+  }
+}
 
 function CreateUser() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState("")
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
-  const [password2, setPassword2] = useState("")
-  const [error, setError] = useState("")
+  const [formState, dispatch] = useReducer(formReducer, {
+    email: '',
+    username: '',
+    password: '',
+    password2: '',
+  });
+  const [error, setError] = React.useState('')
 
-const handleSubmit = async (e) => {
-  e.preventDefault()
+  const handleSubmit = async (e) => {
+    e.preventDefault()
 
-  try {
-    const response = await axios.post("http://localhost:8000/helpdesk/users/users_list/", {
-      email,
-      username,
-      password,
-      password2
-    })
+    try {
+     const response = await createUser(formState)
 
-    const { id, email: userEmail, tokens } = response.data
+      const { id, email: userEmail, tokens } = response.data
 
-    localStorage.setItem('access_token', tokens.access)
-    localStorage.setItem('refresh_token', tokens.refresh)
-    localStorage.setItem('user_id', id)
-    localStorage.setItem('email', userEmail)
+      localStorage.setItem('access_token', tokens.access)
+      localStorage.setItem('refresh_token', tokens.refresh)
+      localStorage.setItem('user_id', id)
+      localStorage.setItem('email', userEmail)
 
-    await login(username, password)
+      await login(formState.username, formState.password)
 
-    navigate("/helpdesk/tickets")
+      dispatch({ field: 'email', value: '' })
+      dispatch({ field: 'username', value: '' })
+      dispatch({ field: 'password', value: '' })
+      dispatch({ field: 'password2', value: '' })
+      setError('')
+      navigate('/helpdesk/tickets')
+    } catch (err) {
+      const errorMessage = err.response?.data
+        ? `Error: ${JSON.stringify(err.response.data)}`
+        : `Error: ${err.message}`
 
-    setEmail("")
-    setUsername("")
-    setPassword("")
-    setPassword2("")
-    setError("")
-  } catch (err) {
-    if (err.response && err.response.data) {
-      setError("Error: " + JSON.stringify(err.response.data))
-    } else {
-      setError("Error: " + err.message)
+      setError(errorMessage)
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user_id')
+      localStorage.removeItem('email')
     }
-
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('user_id')
-    localStorage.removeItem('email')
   }
-};
 
   return (
     <div className="create-user-page">
@@ -66,8 +69,9 @@ const handleSubmit = async (e) => {
             <input
               id="email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              name="email"
+              value={formState.email}
+              onChange={(e) => dispatch({ field: 'email', value: e.target.value })}
               required
             />
           </div>
@@ -77,8 +81,9 @@ const handleSubmit = async (e) => {
             <input
               id="username"
               type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              name="username"
+              value={formState.username}
+              onChange={(e) => dispatch({ field: 'username', value: e.target.value })}
               required
             />
           </div>
@@ -88,8 +93,9 @@ const handleSubmit = async (e) => {
             <input
               id="password"
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              name="password"
+              value={formState.password}
+              onChange={(e) => dispatch({ field: 'password', value: e.target.value })}
               required
             />
           </div>
@@ -99,8 +105,9 @@ const handleSubmit = async (e) => {
             <input
               id="confirmPassword"
               type="password"
-              value={password2}
-              onChange={(e) => setPassword2(e.target.value)}
+              name="password2"
+              value={formState.password2}
+              onChange={(e) => dispatch({ field: 'password2', value: e.target.value })}
               required
             />
           </div>
