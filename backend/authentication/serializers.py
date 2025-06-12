@@ -3,6 +3,7 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from django.contrib.auth import get_user_model
 from django.contrib.auth import authenticate
 from rest_framework import serializers
+from rest_framework_simplejwt.exceptions import TokenError
 
 import logging
 
@@ -52,3 +53,22 @@ class CustomTokenBlackListSerializer(TokenBlacklistSerializer):
         validated_data['message'] = "Token has been blacklisted"
 
         return validated_data
+
+
+class LogoutSerializer(serializers.Serializer):
+    refresh_token = serializers.CharField(required=True)
+
+    def validate_refresh_token(self, value):
+        try:
+            token = RefreshToken(value)
+
+            if hasattr(token, 'blacklist'):
+                token.blacklist()
+
+            return token
+
+        except TokenError as e:
+            raise serializers.ValidationError(str(e))
+
+        except Exception:
+            raise serializers.ValidationError("Invalid refresh token")
