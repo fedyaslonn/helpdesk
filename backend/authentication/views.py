@@ -1,14 +1,13 @@
 from datetime import timezone
 from http.client import responses
 
-from authentication.serializers import CustomTokenObtainPairSerializer, CustomTokenRefreshSerializer, CustomTokenBlackListSerializer
+from authentication.serializers import CustomTokenObtainPairSerializer, CustomTokenRefreshSerializer, CustomTokenBlackListSerializer, LogoutSerializer
 from rest_framework_simplejwt.views import TokenVerifyView, TokenRefreshView, TokenBlacklistView, TokenObtainPairView
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
@@ -47,16 +46,12 @@ class CustomTokenBlackListView(TokenBlacklistView):
 
 class LogoutView(APIView):
     def post(self, request):
-        refresh_token = request.data.get("refresh_token")
+        serializer = LogoutSerializer(data=request.data)
 
-        if not refresh_token:
-            return Response(
-                {"error": "Refresh token is missing"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        serializer.is_valid(raise_exception=True)
+        token = serializer.validated_data['refresh_token']
 
         try:
-            token = RefreshToken(refresh_token)
             token.blacklist()
 
             user_id = token.payload.get('user_id')
@@ -81,11 +76,6 @@ class LogoutView(APIView):
 
             return response
 
-        except TokenError as e:
-            return Response(
-                {"detail": str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
         except Exception as e:
             return Response(
