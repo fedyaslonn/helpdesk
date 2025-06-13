@@ -11,7 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.settings import api_settings
 from django.shortcuts import get_object_or_404
 
-from core.models import Comment, Organization, Ticket, User
+from core.models import Comment, Organization, Ticket, User, Membership
 from core.serializers.tickets import (
     CreateTicketSerializer,
     GetTicketSerializer,
@@ -37,9 +37,18 @@ class TicketsViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
         try:
+            user = self.request.user
             ticket = Ticket.objects.select_related(
                 "requestor", "assignee", "organization"
-            ).get(pk=pk)
+            ).get(
+                Q(pk=pk) &
+                (Q(requestor=user) |
+                Q(assignee=user) |
+                Q(organization__memberships__user=user,
+                  organization__memberships__role=Membership.Role.ADMIN,
+                  organization__memberships__is_active=True))
+            )
+
         except ObjectDoesNotExist:
             return Response(
                 {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
@@ -55,66 +64,33 @@ class TicketsViewSet(viewsets.ViewSet):
             serializer.is_valid(raise_exception=True)
             validated_data = serializer.validated_data
 
+            with transaction.atomic():
+                ticket = Ticket.objects.create(
+                    requestor=request.user,
+                    organization=validated_data.get("organization"),
+                    title=validated_data.get("title"),
+                    description=validated_data.get("description"),
+                    status=Ticket.Status.OPEN,
+                )
+
+                ticket.save()
+                ticket = Ticket.objects.select_related(
+                    "requestor", "assignee", "organization"
+                ).get(id=ticket.id)
+
         except ValidationError as e:
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            requestor_id = validated_data.get("requestor")
-            organization_id = validated_data.get("organization")
-            assignee_id = validated_data.get("assignee")
-
-            if not requestor_id or not organization_id:
-                return Response(
-                    {
-                        "error": "Both requestor id and organization id should be provided"
-                    },
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            try:
-                requestor = User.objects.get(pk=requestor_id)
-                organization = Organization.objects.get(pk=organization_id)
-                assignee = User.objects.get(pk=assignee_id) if assignee_id else None
-            except User.DoesNotExist:
-                return Response(
-                    {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
-                )
-            except Organization.DoesNotExist:
-                return Response(
-                    {"error": "Organization not found"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            if assignee_id is not None:
-                try:
-                    assignee = User.objects.get(
-                        pk=assignee_id, organization=organization
-                    )
-
-                except User.DoesNotExist:
-                    return Response(
-                        {
-                            "error": "Assignee not found or assignee from other organization"
-                        },
-                        status=status.HTTP_404_NOT_FOUND,
-                    )
-
-            ticket = Ticket.objects.create(
-                requestor=requestor,
-                assignee=assignee if assignee else None,
-                organization=organization,
-                title=validated_data["title"],
-                description=validated_data["description"],
-                status=Ticket.Status.OPEN,
+        except User.DoesNotExist:
+            return Response(
+            {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-            ticket.save()
-            ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
-            ).get(id=ticket.id)
-
-        except ValidationError as e:
-            return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+        except Organization.DoesNotExist:
+            return Response(
+            {"error": "Organization not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         except IntegrityError as e:
             return Response(
@@ -148,48 +124,17 @@ class TicketsViewSet(viewsets.ViewSet):
                 {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = UpdateTicketSerializer(data=request.data, partial=False)
+        serializer = UpdateTicketSerializer(ticket, data=request.data, partial=False, context={'request': request})
 
         try:
             serializer.is_valid(raise_exception=True)
             validated_data = serializer.validated_data
 
-        except ValidationError as e:
-            return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+            with transaction.atomic():
+                ticket.title = validated_data.get("title")
+                ticket.description = validated_data.get("description")
 
-        try:
-            assignee_id = validated_data.get("assignee")
-
-            try:
-                organization_id = validated_data.get("organization")
-                organization = Organization.objects.get(pk=organization_id)
-
-            except Organization.DoesNotExist:
-                return Response(
-                    {"error": "Organization not found"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            if assignee_id is not None:
-                try:
-                    assignee = User.objects.get(
-                        pk=assignee_id, organization=organization
-                    )
-
-                except User.DoesNotExist:
-                    return Response(
-                        {
-                            "error": "Assignee not found or assignee from other organization"
-                        },
-                        status=status.HTTP_404_NOT_FOUND,
-                    )
-
-            ticket.assignee = assignee if assignee_id else None
-            ticket.title = validated_data.get("title")
-            ticket.description = validated_data.get("description")
-            ticket.status = validated_data.get("status")
-
-            ticket.save()
+                ticket.save()
 
         except ValidationError as e:
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
@@ -226,32 +171,18 @@ class TicketsViewSet(viewsets.ViewSet):
                 {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = PartialUpdateTicketSerializer(data=request.data, partial=True)
+        serializer = PartialUpdateTicketSerializer(ticket, data=request.data, partial=True, context={'request': request})
 
         try:
             serializer.is_valid(raise_exception=True)
             validated_data = serializer.validated_data
 
-            assignee_id = validated_data.get("assignee")
-            if assignee_id is not None:
-                try:
-                    assignee = User.objects.get(
-                        pk=assignee_id, organization=ticket.organization
-                    )
-                    ticket.assignee = assignee
-                except User.DoesNotExist:
-                    return Response(
-                        {
-                            "error": "Assignee not found or assignee is not a member of the ticket's organization"
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+            with transaction.atomic():
+                for attr, value in validated_data.items():
+                    if attr != "assignee":
+                        setattr(ticket, attr, value)
 
-            for attr, value in validated_data.items():
-                if attr != "assignee":
-                    setattr(ticket, attr, value)
-
-            ticket.save()
+                ticket.save()
 
         except ValidationError as e:
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
@@ -281,6 +212,17 @@ class TicketsViewSet(viewsets.ViewSet):
         try:
             ticket = Ticket.objects.get(pk=pk)
 
+            if not request.user.is_authenticated:
+                return Response(
+                    {"error": "Authentication required"},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+
+            if not ticket.requestor == request.user:
+                return Response(
+                    {"error": "Only requestor can delete its ticket"}, status=status.HTTP_403_FORBIDDEN
+                )
+
             ticket.delete()
             logger.info(f"Ticket {ticket.id} deleted successfully!")
 
@@ -309,7 +251,7 @@ class TicketsViewSet(viewsets.ViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated:
-            return Ticket.objects.filter(organization=user.organization).select_related("requestor", "assignee", "organization")
+            return Ticket.objects.filter(Q(organization=user.organization) | Q(requestor=self.request.user)).select_related("requestor", "assignee", "organization")
 
         return Ticket.objects.none()
 
