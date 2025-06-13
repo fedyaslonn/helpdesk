@@ -120,7 +120,6 @@ class Ticket(TimestampedModel):
     def __str__(self):
         return f"Ticket {self.id} - {self.title}"
 
-
 class Membership(models.Model):
     class Role(models.TextChoices):
         ADMIN = 'admin', _('Admin')
