@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from core.models import Organization, Membership
+from core.models import Membership, Organization
 from core.serializers.users import GetUserSerializer
 
 
@@ -11,7 +11,7 @@ class CreateOrganizationSerializer(serializers.ModelSerializer):
         fields = ["name", "email"]
 
     def validate(self, attrs):
-        request = self.context.get('request')
+        request = self.context.get("request")
 
         if not request or not request.user.is_authenticated:
             raise serializers.ValidationError("User is not authenticated.")
@@ -22,6 +22,7 @@ class CreateOrganizationSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
 
 class GetOrganizationSerializer(serializers.ModelSerializer):
     members = serializers.SerializerMethodField()

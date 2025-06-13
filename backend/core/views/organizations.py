@@ -1,22 +1,20 @@
 import logging
 
-from django.db import DatabaseError, IntegrityError
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import ObjectDoesNotExist, Prefetch
-from rest_framework import status, viewsets
-from rest_framework.exceptions import ValidationError, PermissionDenied
-from rest_framework.response import Response
-from django.db import transaction
 from django.shortcuts import get_object_or_404
+from rest_framework import status, viewsets
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.response import Response
 
-from core.models import Comment, Organization, Ticket, User, Membership
+from core.models import Comment, Membership, Organization, Ticket, User
+from core.permissions import IsAdminOfOrganization
 from core.serializers.organizations import (
     CreateOrganizationSerializer,
     GetOrganizationSerializer,
     PartialUpdateOrganizationSerializer,
     UpdateOrganizationSerializer,
 )
-
-from core.permissions import IsAdminOfOrganization
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +38,9 @@ class OrganizationsViewSet(viewsets.ViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request):
-        serializer = CreateOrganizationSerializer(data=request.data, context={'request': request})
+        serializer = CreateOrganizationSerializer(
+            data=request.data, context={"request": request}
+        )
 
         try:
             serializer.is_valid(raise_exception=True)
@@ -56,7 +56,7 @@ class OrganizationsViewSet(viewsets.ViewSet):
                     user=request.user,
                     organization=organization,
                     role=Membership.Role.ADMIN,
-                    is_active=True
+                    is_active=True,
                 )
 
                 organization = Organization.objects.prefetch_related("members").get(
@@ -96,13 +96,18 @@ class OrganizationsViewSet(viewsets.ViewSet):
         try:
             organization = self.get_object(pk=pk)
 
-            if not IsAdminOfOrganization().has_object_permission(request, self, organization):
-                raise PermissionDenied("Only organization admin can perform this action")
+            if not IsAdminOfOrganization().has_object_permission(
+                request, self, organization
+            ):
+                raise PermissionDenied(
+                    "Only organization admin can perform this action"
+                )
 
-            serializer = UpdateOrganizationSerializer(organization, data=request.data, context={'request': request})
+            serializer = UpdateOrganizationSerializer(
+                organization, data=request.data, context={"request": request}
+            )
             serializer.is_valid(raise_exception=True)
             validated_data = serializer.validated_data
-
 
             with transaction.atomic():
                 organization.name = validated_data.get("name", organization.name)
@@ -114,8 +119,7 @@ class OrganizationsViewSet(viewsets.ViewSet):
 
         except Organization.DoesNotExist:
             return Response(
-                {"error": "Organization not found"},
-                status=status.HTTP_404_NOT_FOUND
+                {"error": "Organization not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
         except ValidationError as e:
@@ -148,14 +152,18 @@ class OrganizationsViewSet(viewsets.ViewSet):
                 {"error": "Organization not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        if not IsAdminOfOrganization().has_object_permission(request, self, organization):
+        if not IsAdminOfOrganization().has_object_permission(
+            request, self, organization
+        ):
             raise PermissionDenied("Only organization admin can perform this action")
 
         serializer = PartialUpdateOrganizationSerializer(
             data=request.data, partial=True
         )
 
-        if not IsAdminOfOrganization().has_object_permission(request, self, organization):
+        if not IsAdminOfOrganization().has_object_permission(
+            request, self, organization
+        ):
             raise PermissionDenied("Only organization admin can perform this action")
 
         try:
@@ -197,14 +205,20 @@ class OrganizationsViewSet(viewsets.ViewSet):
             if not organization:
                 return Response(
                     {"error": "Organization not found"},
-                    status=status.HTTP_404_NOT_FOUND
+                    status=status.HTTP_404_NOT_FOUND,
                 )
 
-            if not IsAdminOfOrganization().has_object_permission(request, self, organization):
-                raise PermissionDenied("Only organization admin can perform this action")
+            if not IsAdminOfOrganization().has_object_permission(
+                request, self, organization
+            ):
+                raise PermissionDenied(
+                    "Only organization admin can perform this action"
+                )
 
             with transaction.atomic():
-                Membership.objects.filter(organization=organization).update(is_active=False)
+                Membership.objects.filter(organization=organization).update(
+                    is_active=False
+                )
 
                 User.objects.filter(organization=organization).update(organization=None)
 

@@ -1,30 +1,29 @@
 import logging
 
-from django.db import DatabaseError, IntegrityError
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import ObjectDoesNotExist, Prefetch, Q
+from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db import transaction
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from rest_framework.decorators import action
 from rest_framework.settings import api_settings
-from django.shortcuts import get_object_or_404
 
-from core.models import Comment, Organization, Ticket, User, Membership
+from core.filters.tickets import TicketFilter
+from core.models import Comment, Membership, Organization, Ticket, User
 from core.serializers.tickets import (
     CreateTicketSerializer,
     GetTicketSerializer,
     PartialUpdateTicketSerializer,
-    UpdateTicketSerializer
+    UpdateTicketSerializer,
 )
-from core.filters.tickets import TicketFilter
 
 logger = logging.getLogger(__name__)
 
 
 class TicketsViewSet(viewsets.ViewSet):
-    filter_backends = (DjangoFilterBackend, )
+    filter_backends = (DjangoFilterBackend,)
     filterset_class = TicketFilter
 
     def list(self, request):
@@ -41,12 +40,16 @@ class TicketsViewSet(viewsets.ViewSet):
             ticket = Ticket.objects.select_related(
                 "requestor", "assignee", "organization"
             ).get(
-                Q(pk=pk) &
-                (Q(requestor=user) |
-                Q(assignee=user) |
-                Q(organization__memberships__user=user,
-                  organization__memberships__role=Membership.Role.ADMIN,
-                  organization__memberships__is_active=True))
+                Q(pk=pk)
+                & (
+                    Q(requestor=user)
+                    | Q(assignee=user)
+                    | Q(
+                        organization__memberships__user=user,
+                        organization__memberships__role=Membership.Role.ADMIN,
+                        organization__memberships__is_active=True,
+                    )
+                )
             )
 
         except ObjectDoesNotExist:
@@ -83,12 +86,12 @@ class TicketsViewSet(viewsets.ViewSet):
 
         except User.DoesNotExist:
             return Response(
-            {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
         except Organization.DoesNotExist:
             return Response(
-            {"error": "Organization not found"},
+                {"error": "Organization not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -124,7 +127,9 @@ class TicketsViewSet(viewsets.ViewSet):
                 {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = UpdateTicketSerializer(ticket, data=request.data, partial=False, context={'request': request})
+        serializer = UpdateTicketSerializer(
+            ticket, data=request.data, partial=False, context={"request": request}
+        )
 
         try:
             serializer.is_valid(raise_exception=True)
@@ -171,7 +176,9 @@ class TicketsViewSet(viewsets.ViewSet):
                 {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = PartialUpdateTicketSerializer(ticket, data=request.data, partial=True, context={'request': request})
+        serializer = PartialUpdateTicketSerializer(
+            ticket, data=request.data, partial=True, context={"request": request}
+        )
 
         try:
             serializer.is_valid(raise_exception=True)
@@ -215,12 +222,13 @@ class TicketsViewSet(viewsets.ViewSet):
             if not request.user.is_authenticated:
                 return Response(
                     {"error": "Authentication required"},
-                    status=status.HTTP_401_UNAUTHORIZED
+                    status=status.HTTP_401_UNAUTHORIZED,
                 )
 
             if not ticket.requestor == request.user:
                 return Response(
-                    {"error": "Only requestor can delete its ticket"}, status=status.HTTP_403_FORBIDDEN
+                    {"error": "Only requestor can delete its ticket"},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
             ticket.delete()
@@ -251,7 +259,9 @@ class TicketsViewSet(viewsets.ViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated:
-            return Ticket.objects.filter(Q(organization=user.organization) | Q(requestor=self.request.user)).select_related("requestor", "assignee", "organization")
+            return Ticket.objects.filter(
+                Q(organization=user.organization) | Q(requestor=self.request.user)
+            ).select_related("requestor", "assignee", "organization")
 
         return Ticket.objects.none()
 

@@ -1,8 +1,8 @@
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinLengthValidator
 from django.db import models
-from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 
 # Create your models here.
 
@@ -120,13 +120,16 @@ class Ticket(TimestampedModel):
     def __str__(self):
         return f"Ticket {self.id} - {self.title}"
 
+
 class Membership(models.Model):
     class Role(models.TextChoices):
-        ADMIN = 'admin', _('Admin')
-        WORKER = 'worker', _('Worker')
+        ADMIN = "admin", _("Admin")
+        WORKER = "worker", _("Worker")
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='memberships')
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='memberships')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="memberships")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="memberships"
+    )
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.WORKER)
     is_active = models.BooleanField(default=True)
 
@@ -135,15 +138,13 @@ class Membership(models.Model):
         verbose_name_plural = _("Memberships")
         db_table = "Membership"
 
-        unique_together = [
-            ('user', 'organization')
-        ]
+        unique_together = [("user", "organization")]
 
         constraints = [
             models.UniqueConstraint(
-                fields=['organization'],
-                condition=Q(role='admin', is_active=True),
-                name='unique_active_admin_per_organization'
+                fields=["organization"],
+                condition=Q(role="admin", is_active=True),
+                name="unique_active_admin_per_organization",
             )
         ]
 
