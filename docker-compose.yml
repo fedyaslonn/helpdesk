@@ -36,7 +36,20 @@ services:
       - app_network
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
+  celery_worker:
+    build: .
+    restart: unless-stopped
+    command: celery -A helpdesk worker -l info
+    environment:
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+    depends_on:
+      web:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - app_network
   redis:
     image: redis:latest
     container_name: redis
