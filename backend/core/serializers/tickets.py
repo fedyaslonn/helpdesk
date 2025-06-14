@@ -148,4 +148,118 @@ class PartialUpdateTicketSerializer(serializers.ModelSerializer):
                     "Only organization admins or the assignee can change the status"
                 )
 
+            if attrs["status"] == ticket.status:
+                raise serializers.ValidationError(
+                    {"status": "New statis must be different from old"}
+                )
+
+        return attrs
+
+
+class ChangeAssigneeSerializer(serializers.ModelSerializer):
+    old_assignee = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        error_messages={"user": "User does not exist"},
+        required=True
+    )
+
+    new_assignee = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        error_messages={"user": "User does not exist"},
+        required=True
+    )
+
+    class Meta:
+        model = Ticket
+        fields = ["old_assignee", "new_assignee"]
+
+    def validate_old_assignee(self, val):
+        ticket = self.instance
+
+        if ticket.assignee is None:
+            if val is not None:
+                raise serializers.ValidationError(
+                    {
+                        "old_assignee": "Ticket has no assignee but old assignee was provided"
+                    }
+                )
+
+        if ticket.assignee != val:
+            raise serializers.ValidationError(
+                {
+                    "old_assignee": "Provided assignee does not match current ticket assignee"
+                }
+            )
+
+        return val
+
+    def validate_new_assignee(self, val):
+        ticket = self.instance
+
+        if not Membership.objects.filter(
+                user=val,
+                organization=ticket.organization,
+                is_active=True
+            ).exists():
+                raise serializers.ValidationError({
+                    "new_assignee": "User is not an active member of the ticket's organization"
+                })
+
+        return val
+
+    def validate(self, attrs):
+        if attrs["old_assignee"] == attrs["new_assignee"]:
+            raise serializers.ValidationError(
+                {"new_assignee": "New assignee must be different from old assignee"}
+            )
+
+        return attrs
+
+class RemoveAssigneeSerializer(serializers.Serializer):
+    def validate(self, attrs):
+        ticket = self.context.get('ticket')
+
+        if ticket.assignee is None:
+            raise serializers.ValidationError(
+                    {
+                        "assignee": "Ticket has no assignee"
+                    }
+                )
+
+        return attrs
+
+
+class SetAssigneeSerializer(serializers.ModelSerializer):
+    assignee = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        error_messages={"user": "User does not exist"},
+        required=True
+    )
+
+    class Meta:
+        model = Ticket
+        fields = ["assignee"]
+
+    def validate_assignee(self, val):
+        ticket = self.instance
+
+        if not Membership.objects.filter(
+                user=val,
+                organization=ticket.organization,
+                is_active=True
+            ).exists():
+                raise serializers.ValidationError({
+                    "new_assignee": "User is not an active member of the ticket's organization"
+                })
+
+        return val
+
+    def validate(self, attrs):
+        ticket = self.instance
+
+        if ticket.assignee:
+            raise serializers.ValidationError(
+                "Ticket has already been assigned"
+            )
+
         return attrs
