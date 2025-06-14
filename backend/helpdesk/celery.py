@@ -1,9 +1,8 @@
-from celery import Celery
-
-import os
-from dotenv import load_dotenv
-
 import logging
+import os
+
+from celery import Celery
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 

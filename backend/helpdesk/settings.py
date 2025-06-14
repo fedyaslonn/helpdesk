@@ -171,13 +171,13 @@ SIMPLE_JWT = {
     "TOKEN_BLACKLIST_SERIALIZER": "authentication.serializers.CustomTokenBlacklistSerializer",
 }
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = os.getenv('EMAIL_HOST')
-EMAIL_PORT = os.getenv('EMAIL_PORT')
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = os.getenv("EMAIL_PORT")
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAUL_FROM_EMAIL')
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAUL_FROM_EMAIL")
 
 CELERY_TASK_ALWAYS_EAGER = False
 CELERY_TASK_ACKS_LATE = True
@@ -186,17 +186,16 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 2
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 100
 CELERY_TASK_CREATE_MISSING_QUEUES = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = 'UTC'
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "UTC"
 CELERY_ENABLE_UTC = True
 CELERY_TASK_PUBLISH_RETRY = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_TASK_PUBLISH_RETRY_POLICY = {
-    'max_retries': 3,
-    'interval_start': 0.2,
-    'interval_step': 0.3,
-    'interval_max': 1.0,
+    "max_retries": 3,
+    "interval_start": 0.2,
+    "interval_step": 0.3,
+    "interval_max": 1.0,
 }
-

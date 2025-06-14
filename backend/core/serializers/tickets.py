@@ -160,13 +160,13 @@ class ChangeAssigneeSerializer(serializers.ModelSerializer):
     old_assignee = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(),
         error_messages={"user": "User does not exist"},
-        required=True
+        required=True,
     )
 
     new_assignee = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(),
         error_messages={"user": "User does not exist"},
-        required=True
+        required=True,
     )
 
     class Meta:
@@ -197,13 +197,13 @@ class ChangeAssigneeSerializer(serializers.ModelSerializer):
         ticket = self.instance
 
         if not Membership.objects.filter(
-                user=val,
-                organization=ticket.organization,
-                is_active=True
-            ).exists():
-                raise serializers.ValidationError({
+            user=val, organization=ticket.organization, is_active=True
+        ).exists():
+            raise serializers.ValidationError(
+                {
                     "new_assignee": "User is not an active member of the ticket's organization"
-                })
+                }
+            )
 
         return val
 
@@ -215,16 +215,13 @@ class ChangeAssigneeSerializer(serializers.ModelSerializer):
 
         return attrs
 
+
 class RemoveAssigneeSerializer(serializers.Serializer):
     def validate(self, attrs):
-        ticket = self.context.get('ticket')
+        ticket = self.context.get("ticket")
 
         if ticket.assignee is None:
-            raise serializers.ValidationError(
-                    {
-                        "assignee": "Ticket has no assignee"
-                    }
-                )
+            raise serializers.ValidationError({"assignee": "Ticket has no assignee"})
 
         return attrs
 
@@ -233,7 +230,7 @@ class SetAssigneeSerializer(serializers.ModelSerializer):
     assignee = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(),
         error_messages={"user": "User does not exist"},
-        required=True
+        required=True,
     )
 
     class Meta:
@@ -244,13 +241,13 @@ class SetAssigneeSerializer(serializers.ModelSerializer):
         ticket = self.instance
 
         if not Membership.objects.filter(
-                user=val,
-                organization=ticket.organization,
-                is_active=True
-            ).exists():
-                raise serializers.ValidationError({
+            user=val, organization=ticket.organization, is_active=True
+        ).exists():
+            raise serializers.ValidationError(
+                {
                     "new_assignee": "User is not an active member of the ticket's organization"
-                })
+                }
+            )
 
         return val
 
@@ -258,8 +255,6 @@ class SetAssigneeSerializer(serializers.ModelSerializer):
         ticket = self.instance
 
         if ticket.assignee:
-            raise serializers.ValidationError(
-                "Ticket has already been assigned"
-            )
+            raise serializers.ValidationError("Ticket has already been assigned")
 
         return attrs

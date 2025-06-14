@@ -13,18 +13,20 @@ from rest_framework.settings import api_settings
 from core.filters.tickets import TicketFilter
 from core.models import Comment, Membership, Organization, Ticket, User
 from core.serializers.tickets import (
+    ChangeAssigneeSerializer,
     CreateTicketSerializer,
     GetTicketSerializer,
     PartialUpdateTicketSerializer,
-    UpdateTicketSerializer,
-    ChangeAssigneeSerializer,
     RemoveAssigneeSerializer,
-    SetAssigneeSerializer
+    SetAssigneeSerializer,
+    UpdateTicketSerializer,
 )
-
-
-from core.tasks import send_change_status_notification, send_change_assignee_notification, send_remove_assignee_notification, send_set_assignee_notification
-
+from core.tasks import (
+    send_change_assignee_notification,
+    send_change_status_notification,
+    send_remove_assignee_notification,
+    send_set_assignee_notification,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -199,12 +201,12 @@ class TicketsViewSet(viewsets.ViewSet):
                         setattr(ticket, attr, value)
                 ticket.save()
 
-                if 'status' in validated_data:
-                    transaction.on_commit(lambda: send_change_status_notification.delay(
-                        ticket.id,
-                        old_status,
-                        ticket.status
-                    ))
+                if "status" in validated_data:
+                    transaction.on_commit(
+                        lambda: send_change_status_notification.delay(
+                            ticket.id, old_status, ticket.status
+                        )
+                    )
 
         except ValidationError as e:
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
@@ -274,21 +276,27 @@ class TicketsViewSet(viewsets.ViewSet):
     @action(detail=True, methods=["post"])
     def change_assignee(self, request, pk=None):
         try:
-            ticket = Ticket.objects.select_related('requestor', 'assignee', 'organization').get(pk=pk)
+            ticket = Ticket.objects.select_related(
+                "requestor", "assignee", "organization"
+            ).get(pk=pk)
 
             if not Membership.objects.filter(
-                    user=request.user,
-                    organization=ticket.organization,
-                    role=Membership.Role.ADMIN,
-                    is_active=True
+                user=request.user,
+                organization=ticket.organization,
+                role=Membership.Role.ADMIN,
+                is_active=True,
             ).exists():
                 return Response(
                     {"error": "Only organization admins can change assignee"},
-                    status=status.HTTP_403_FORBIDDEN
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
-            serializer = ChangeAssigneeSerializer(instance=ticket, data=request.data, partial=False,
-                                                  context={'request': request, 'ticket': ticket})
+            serializer = ChangeAssigneeSerializer(
+                instance=ticket,
+                data=request.data,
+                partial=False,
+                context={"request": request, "ticket": ticket},
+            )
 
             try:
                 serializer.is_valid(raise_exception=True)
@@ -302,17 +310,15 @@ class TicketsViewSet(viewsets.ViewSet):
                 ticket.assignee = validated_data["new_assignee"]
                 ticket.save()
 
-                transaction.on_commit(lambda: send_change_assignee_notification.delay(
-                    ticket.id,
-                    old_assignee.id,
-                    ticket.assignee.id
-                ))
+                transaction.on_commit(
+                    lambda: send_change_assignee_notification.delay(
+                        ticket.id, old_assignee.id, ticket.assignee.id
+                    )
+                )
 
         except Ticket.DoesNotExist:
             return Response(
-                {
-                    "error": "Ticket not found"
-                },
+                {"error": "Ticket not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -338,24 +344,25 @@ class TicketsViewSet(viewsets.ViewSet):
 
         return Response(data=response.data, status=status.HTTP_200_OK)
 
-
     @action(detail=True, methods=["post"])
     def remove_assignee(self, request, pk=None):
         try:
-            ticket = Ticket.objects.select_related('requestor', 'assignee', 'organization').get(pk=pk)
+            ticket = Ticket.objects.select_related(
+                "requestor", "assignee", "organization"
+            ).get(pk=pk)
 
             if not Membership.objects.filter(
                 user=request.user,
                 organization=ticket.organization,
                 role=Membership.Role.ADMIN,
-                is_active=True
+                is_active=True,
             ).exists():
                 return Response(
                     {"error": "Only organization admins can remove assignee"},
-                    status=status.HTTP_403_FORBIDDEN
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
-            serializer = RemoveAssigneeSerializer(data={}, context={'ticket': ticket})
+            serializer = RemoveAssigneeSerializer(data={}, context={"ticket": ticket})
 
             old_assignee = ticket.assignee
 
@@ -370,16 +377,15 @@ class TicketsViewSet(viewsets.ViewSet):
                 ticket.assignee = None
                 ticket.save()
 
-                transaction.on_commit(lambda: send_remove_assignee_notification.delay(
-                    ticket.id,
-                    old_assignee.id
-                ))
+                transaction.on_commit(
+                    lambda: send_remove_assignee_notification.delay(
+                        ticket.id, old_assignee.id
+                    )
+                )
 
         except Ticket.DoesNotExist:
             return Response(
-                {
-                    "error": "Ticket not found"
-                },
+                {"error": "Ticket not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -389,17 +395,19 @@ class TicketsViewSet(viewsets.ViewSet):
     @action(detail=True, methods=["post"])
     def set_assignee(self, request, pk=None):
         try:
-            ticket = Ticket.objects.select_related('requestor', 'assignee', 'organization').get(pk=pk)
+            ticket = Ticket.objects.select_related(
+                "requestor", "assignee", "organization"
+            ).get(pk=pk)
 
             if not Membership.objects.filter(
                 user=request.user,
                 organization=ticket.organization,
                 role=Membership.Role.ADMIN,
-                is_active=True
+                is_active=True,
             ).exists():
                 return Response(
                     {"error": "Only organization admins can set assignee"},
-                    status=status.HTTP_403_FORBIDDEN
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
             serializer = SetAssigneeSerializer(ticket, data=request.data)
@@ -415,16 +423,15 @@ class TicketsViewSet(viewsets.ViewSet):
                 ticket.assignee = validated_data.get("assignee")
                 ticket.save()
 
-                transaction.on_commit(lambda: send_set_assignee_notification.delay(
-                    ticket.id,
-                    ticket.assignee.id
-                ))
+                transaction.on_commit(
+                    lambda: send_set_assignee_notification.delay(
+                        ticket.id, ticket.assignee.id
+                    )
+                )
 
         except Ticket.DoesNotExist:
             return Response(
-                {
-                    "error": "Ticket not found"
-                },
+                {"error": "Ticket not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
 

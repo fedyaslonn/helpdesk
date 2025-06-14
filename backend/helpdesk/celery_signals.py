@@ -1,13 +1,13 @@
+import logging
+
 from celery import shared_task
 from celery.signals import (
-    task_prerun,
-    task_success,
     task_failure,
-    task_retry,
     task_postrun,
+    task_prerun,
+    task_retry,
+    task_success,
 )
-
-import logging
 
 logger = logging.getLogger(__name__)
 
