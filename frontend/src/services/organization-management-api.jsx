@@ -7,7 +7,7 @@ const api = axios.create({
 })
 
 export const createOrganization = (orgData) => {
-  return api.post('/organizations/organizations_list/', orgData)
+  return api.post('helpdesk/organizations/organizations_list/', orgData)
 }
 
 export const getOrganizations = () => {
