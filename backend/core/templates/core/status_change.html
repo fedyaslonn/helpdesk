@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Status Update: {{ ticket.title }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .status-change {
+            background: #dff0d8;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .footer {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>Status Update: {{ ticket.title }}</h2>
+    </div>
+
+    <div class="status-change">
+        <p><strong>Status changed:</strong></p>
+        <p>From: <span style="color: #6c757d">{{ old_status }}</span></p>
+        <p>To: <span style="color: #28a745">{{ new_status }}</span></p>
+    </div>
+
+    <div class="details">
+        <p><strong>Description:</strong> {{ ticket.description }}</p>
+        <p><strong>Organization:</strong> {{ ticket.organization.name }}</p>
+        {% if ticket.assignee %}
+            <p><strong>Assignee:</strong> {{ ticket.assignee.username }}</p>
+        {% else %}
+            <p><strong>Assignee:</strong> Unassigned</p>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        This is an automated notification. Please do not reply to this email.
+    </div>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>New Task Assignment</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: #d4edda;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .task-details {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .footer {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>New Task Assigned: {{ ticket.title }}</h2>
+    </div>
+
+    <div class="task-details">
+        <p><strong>Description:</strong> {{ ticket.description }}</p>
+        <p><strong>Status:</strong> {{ ticket.get_status_display }}</p>
+        <p><strong>Organization:</strong> {{ ticket.organization.name }}</p>
+    </div>
+
+    <div class="footer">
+        This is an automated notification. Please do not reply to this email.
+    </div>
+</body>
+</html>
