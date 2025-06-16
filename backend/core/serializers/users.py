@@ -9,6 +9,8 @@ from core.models import User
 
 
 class GetUserSerializer(serializers.ModelSerializer):
+    organization = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -22,6 +24,12 @@ class GetUserSerializer(serializers.ModelSerializer):
         ]
 
         extra_kwargs = {field: {"read_only": True} for field in fields}
+
+    def get_organization(self, obj):
+        if obj.organization:
+            return {"name": obj.organization.name}
+
+        return None
 
 
 class CreateUserSerializer(serializers.ModelSerializer):

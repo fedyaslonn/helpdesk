@@ -7,6 +7,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.models import Comment, Organization, Ticket, User
 from core.serializers.users import (
@@ -59,7 +60,17 @@ class UsersViewSet(viewsets.ViewSet):
 
             user.set_password(validated_data["password"])
             user.save()
-            user.objects.select_related("organization")
+
+            refresh = RefreshToken.for_user(user)
+
+            user_with_org = User.objects.select_related("organization").get(pk=user.id)
+
+            response_data = GetUserSerializer(user_with_org).data
+
+            response_data["tokens"] = {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            }
 
         except ValidationError as e:
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
@@ -82,8 +93,7 @@ class UsersViewSet(viewsets.ViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        response = GetUserSerializer(user)
-        return Response(response.data, status=status.HTTP_201_CREATED)
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
     def update(self, request, pk=None):
         try:
