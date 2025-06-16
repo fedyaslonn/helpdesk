@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
+from rest_framework.decorators import action
 
 from core.models import Comment, Membership, Organization, Ticket, User
 from core.permissions import IsAdminOfOrganization
@@ -15,6 +16,7 @@ from core.serializers.organizations import (
     PartialUpdateOrganizationSerializer,
     UpdateOrganizationSerializer,
 )
+from core.serializers.memberships import GetMembershipSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -255,3 +257,43 @@ class OrganizationsViewSet(viewsets.ViewSet):
 
     def get_queryset(self):
         return Organization.objects.prefetch_related("members").all()
+
+    @action(detail=False, methods=['get'])
+    def get_members(self, request, pk=None):
+        try:
+            organization = get_object_or_404(Organization, pk=pk)
+
+            user_organization = request.user.organization
+
+            if not user_organization or user_organization != organization:
+                return Response(
+                    {"detail": "You don't have access to this organization"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            try:
+                memberships = Membership.objects.filter(
+                    organization=request.user.organization,
+                    is_active=True
+                ).select_related('user')
+
+
+            except ObjectDoesNotExist:
+                return Response(
+                    {"error": "Membership not found"}, status=status.HTTP_404_NOT_FOUND
+                )
+
+            serializer = GetMembershipSerializer(memberships, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except DatabaseError as e:
+            return Response(
+                {"error": f"Database error: {str(e)}"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Server error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
