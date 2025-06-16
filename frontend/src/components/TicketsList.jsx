@@ -3,15 +3,18 @@ import { useAuth } from '../auth/AuthContext'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import '../styles/TicketsPage.css'
 import '../styles/Filters.css'
-import { apiClientInstance } from '../api/ApiClient'
+import { getTickets, getCurrentUser } from '../services/ticket-management-api'
+import { serverApi } from "../contants"
+
 
 const TicketsPage = () => {
-  const { user, isAuthenticated } = useAuth()
+  const { user: contextUser, isAuthenticated } = useAuth()
   const [tickets, setTickets] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
+  const [userData, setUserData] = useState(null)
 
   const initialStatusFilter = searchParams.get('status') || null
   const initialAssigneeFilter = searchParams.get('assignee') || null
@@ -26,55 +29,85 @@ const TicketsPage = () => {
   }
 
   useEffect(() => {
-    const fetchTickets = async () => {
+    const fetchData = async () => {
+      if (!isAuthenticated) return
+
       try {
         setIsLoading(true)
-        const params = new URLSearchParams()
-        if (statusFilter) params.append('status', statusFilter)
-        if (assigneeFilter) params.append('assignee', assigneeFilter)
-        const response = await apiClientInstance.get(`/helpdesk/tickets/tickets_list/?${params.toString()}`)
-        setTickets(response.data)
+
+        const token = localStorage.getItem('token')
+        console.log("Current token:", token)
+        console.log("Is authenticated:", isAuthenticated)
+
+        const [userResponse, ticketsResponse] = await Promise.all([
+          getCurrentUser(),
+          getTickets({
+            status: statusFilter,
+            assignee: assigneeFilter
+          })
+        ]);
+
+        setUserData(userResponse.data)
+        setTickets(ticketsResponse.data)
+
+        console.log("User data loaded:", userResponse.data)
+        console.log("Tickets loaded:", ticketsResponse.data)
       } catch (err) {
-        setError('Не удалось загрузить тикеты')
-        console.error('Ошибка загрузки тикетов:', err)
+        console.error('Error loading data:', err)
+        if (err.response) {
+          console.error("Response status:", err.response.status)
+          console.error("Response data:", err.response.data)
+
+          if (err.response.status === 401) {
+            setError('Session expired. Please login again.')
+            localStorage.removeItem('token')
+            navigate('/login');
+          } else {
+            setError('Failed to load data')
+          }
+        } else {
+          setError('Network error')
+        }
       } finally {
         setIsLoading(false)
       }
-    };
-
-    if (isAuthenticated) {
-      fetchTickets()
     }
-  }, [isAuthenticated, statusFilter, assigneeFilter])
 
+    fetchData();
+  }, [isAuthenticated, statusFilter, assigneeFilter, navigate])
 
-  const filteredTickets = tickets.filter(ticket => {
-    const matchesStatus = !statusFilter || ticket.status === statusFilter
-    const matchesAssignee = !assigneeFilter ||
-      (ticket.assignee && ticket.assignee.username === assigneeFilter)
-    return matchesStatus && matchesAssignee
-  })
+  const currentUser = userData || contextUser
 
+  const myRequests = tickets.filter(ticket =>
+    ticket.requestor && currentUser && ticket.requestor.id === currentUser.id
+  )
+
+  const organizationTickets = tickets.filter(ticket => {
+    if (!ticket.organization || !currentUser?.organization) return false
+
+    const ticketOrgId = Number(ticket.organization.id)
+    const userOrgId = Number(currentUser.organization.id)
+
+    return ticketOrgId === userOrgId
+  }).filter(ticket =>
+    !(ticket.requestor && currentUser && ticket.requestor.id === currentUser.id)
+  )
+
+  const assignedToMe = tickets.filter(ticket =>
+    ticket.assignee && currentUser && ticket.assignee.id === currentUser.id
+  ).filter(ticket =>
+
+    !(ticket.requestor && currentUser && ticket.requestor.id === currentUser.id)
+  )
 
   const groupedTickets = {
-
-    MY_REQUESTS: filteredTickets.filter(ticket =>
-      ticket.requestor && user && ticket.requestor.id === user.id
-    ),
-
-
-    ORGANIZATION: filteredTickets.filter(ticket =>
-      ticket.organization &&
-      user?.organization &&
-      ticket.organization.id === user.organization.id &&
-      ticket.requestor.id !== user.id
-    ),
-
-    ASSIGNED_TO_ME: filteredTickets.filter(ticket =>
-      ticket.assignee && user && ticket.assignee.id === user.id
-    )
+    MY_REQUESTS: myRequests,
+    ORGANIZATION: organizationTickets,
+    ASSIGNED_TO_ME: assignedToMe
   }
 
+  console.log("Current user:", currentUser)
+  console.log("Organization tickets count:", organizationTickets.length)
 
   const renderTicketCard = (ticket) => (
     <div key={ticket.id} className="ticket-card">
@@ -116,7 +149,6 @@ const TicketsPage = () => {
       </div>
     </div>
   )
-
 
   const renderTicketSection = (title, tickets) => (
     <div className="ticket-section">
@@ -163,8 +195,21 @@ const TicketsPage = () => {
       <div className="filters-section">
         <div className="filters-header">
           <div className="filters-title">
-            <svg xmlns="http://www.w3.org/2000/svg" className="filters-title-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="filters-title-icon"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              width="16"
+              height="16"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+              />
             </svg>
             <span>Filters</span>
             {(statusFilter || assigneeFilter) && (
@@ -192,9 +237,10 @@ const TicketsPage = () => {
                   const newStatus = statusFilter === status ? null : status;
                   setStatusFilter(newStatus);
                   setSearchParams((prev) => {
-                    if (newStatus) prev.set('status', newStatus);
-                    else prev.delete('status');
-                    return prev;
+                    const newParams = new URLSearchParams(prev);
+                    if (newStatus) newParams.set('status', newStatus);
+                    else newParams.delete('status');
+                    return newParams;
                   });
                 }}
               >
@@ -218,12 +264,13 @@ const TicketsPage = () => {
                   className={`filter-btn assignee ${assigneeFilter === username ? 'selected' : ''}`}
                   onClick={() => {
                     const newAssignee = assigneeFilter === username ? null : username;
-                    setAssigneeFilter(newAssignee);
+                    setAssigneeFilter(newAssignee)
                     setSearchParams((prev) => {
-                      if (newAssignee) prev.set('assignee', newAssignee);
-                      else prev.delete('assignee');
-                      return prev;
-                    });
+                      const newParams = new URLSearchParams(prev)
+                      if (newAssignee) newParams.set('assignee', newAssignee)
+                      else newParams.delete('assignee')
+                      return newParams
+                    })
                   }}
                 >
                   {username}
