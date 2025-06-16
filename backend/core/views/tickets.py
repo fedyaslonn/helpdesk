@@ -1,7 +1,7 @@
 import logging
 
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import ObjectDoesNotExist, Prefetch, Q
+from django.db.models import ObjectDoesNotExist, Prefetch, Q, OuterRef, Exists
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
@@ -48,20 +48,25 @@ class TicketsViewSet(viewsets.ViewSet):
             user = self.request.user
             ticket = Ticket.objects.select_related(
                 "requestor", "assignee", "organization"
-            ).get(
-                Q(pk=pk)
-                & (
-                    Q(requestor=user)
-                    | Q(assignee=user)
-                    | Q(
-                        organization__memberships__user=user,
-                        organization__memberships__role=Membership.Role.ADMIN,
-                        organization__memberships__is_active=True,
-                    )
-                )
-            )
+            ).get(pk=pk)
 
-        except ObjectDoesNotExist:
+            is_requestor = ticket.requestor == user
+            is_assignee = ticket.assignee == user if ticket.assignee else False
+
+            is_org_admin = Membership.objects.filter(
+                user=user,
+                organization=ticket.organization,
+                role=Membership.Role.ADMIN,
+                is_active=True
+            ).exists()
+
+            if not (is_requestor or is_assignee or is_org_admin):
+                return Response(
+                    {"error": "You don't have permission to view this ticket"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        except Ticket.DoesNotExist:
             return Response(
                 {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
             )
@@ -437,6 +442,26 @@ class TicketsViewSet(viewsets.ViewSet):
 
         response = GetTicketSerializer(ticket)
         return Response(data=response.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'])
+    def admin_check(self, request, pk=None):
+        if not request.user.is_authenticated:
+            return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        try:
+            ticket = Ticket.objects.get(pk=pk)
+
+            is_admin = Membership.objects.filter(
+                user_id=request.user.id,
+                organization=ticket.organization.id,
+                role=Membership.Role.ADMIN,
+                is_active=True
+            ).exists()
+
+            return Response({"is_admin": is_admin})
+
+        except Ticket.DoesNotExist:
+            return Response({"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND)
 
     def get_queryset(self):
         user = self.request.user

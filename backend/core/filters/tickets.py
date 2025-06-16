@@ -8,7 +8,6 @@ class TicketFilter(filters.FilterSet):
         choices=Ticket.Status.choices,
         field_name="status",
     )
-
     assignee = filters.ModelMultipleChoiceFilter(
         queryset=User.objects.all(),
         field_name="assignee__username",
@@ -18,7 +17,7 @@ class TicketFilter(filters.FilterSet):
 
     class Meta:
         model = Ticket
-        fields = ["status", "created_at", "assignee"]
+        fields = ["status", "assignee"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
