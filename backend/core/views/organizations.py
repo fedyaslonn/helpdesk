@@ -4,19 +4,19 @@ from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import ObjectDoesNotExist, Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
-from rest_framework.decorators import action
 
 from core.models import Comment, Membership, Organization, Ticket, User
 from core.permissions import IsAdminOfOrganization
+from core.serializers.memberships import GetMembershipSerializer
 from core.serializers.organizations import (
     CreateOrganizationSerializer,
     GetOrganizationSerializer,
     PartialUpdateOrganizationSerializer,
     UpdateOrganizationSerializer,
 )
-from core.serializers.memberships import GetMembershipSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +276,6 @@ class OrganizationsViewSet(viewsets.ViewSet):
                     organization=request.user.organization,
                     is_active=True
                 ).select_related('user')
-
 
             except ObjectDoesNotExist:
                 return Response(
