@@ -25,7 +25,7 @@ organization_detail = OrganizationsViewSet.as_view(
 
 organization_get_members = OrganizationsViewSet.as_view({"get": "get_members"})
 
-comment_creation = CommentsViewSet.as_view({"post": "create"})
+comment_creation = CommentsViewSet.as_view({"get": "list", "post": "create"})
 
 comment_detail = CommentsViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
@@ -64,8 +64,14 @@ urlpatterns = [
         "organizations/organizations_list/", organization_list, name="organization-list"
     ),
     path("organizations/<int:pk>/", organization_detail, name="organization-detail"),
-    path("comments/comments_creation/", comment_creation, name="comment-creation"),
-    path("comments/<int:pk>/", comment_detail, name="comment-detail"),
+    path(
+        "tickets/<int:ticket_pk>/comments/", comment_creation, name="comment-creation"
+    ),
+    path(
+        "tickets/<int:ticket_pk>/comments/<int:pk>/",
+        comment_detail,
+        name="comment-detail",
+    ),
     path("tickets/tickets_list/", ticket_list, name="ticket-list"),
     path("tickets/<int:pk>/", ticket_detail, name="ticket-detail"),
     path(
