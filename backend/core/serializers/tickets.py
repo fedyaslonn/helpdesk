@@ -1,5 +1,4 @@
-from datetime import timezone
-
+from django.utils import timezone
 from django.core.validators import MinLengthValidator
 from rest_framework import serializers
 
