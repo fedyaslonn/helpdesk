@@ -258,7 +258,7 @@ class OrganizationsViewSet(viewsets.ViewSet):
     def get_queryset(self):
         return Organization.objects.prefetch_related("members").all()
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=["get"])
     def get_members(self, request, pk=None):
         try:
             organization = get_object_or_404(Organization, pk=pk)
@@ -268,14 +268,13 @@ class OrganizationsViewSet(viewsets.ViewSet):
             if not user_organization or user_organization != organization:
                 return Response(
                     {"detail": "You don't have access to this organization"},
-                    status=status.HTTP_403_FORBIDDEN
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
             try:
                 memberships = Membership.objects.filter(
-                    organization=request.user.organization,
-                    is_active=True
-                ).select_related('user')
+                    organization=request.user.organization, is_active=True
+                ).select_related("user")
 
             except ObjectDoesNotExist:
                 return Response(
@@ -294,5 +293,5 @@ class OrganizationsViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response(
                 {"error": f"Server error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
