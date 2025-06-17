@@ -34,3 +34,27 @@ export const updateTicket = (id, data) => {
 export const getMembers = (orgId) => {
     return apiClientInstance.get(`${serverApi}/helpdesk/organizations/${orgId}/members/`)
 }
+
+export const getTicketComments = (id) => {
+  return apiClientInstance.get(`/helpdesk/tickets/${id}/comments/`)
+}
+
+export const removeTicketAssignee = (id) => {
+  return apiClientInstance.post(`/helpdesk/tickets/${id}/remove_assignee/`, {})
+}
+
+export const updateTicketStatus = (id, status) => {
+  return apiClientInstance.patch(`/helpdesk/tickets/${id}/`, { status })
+}
+
+export const addTicketComment = (id, text) => {
+  return apiClientInstance.post(`/helpdesk/tickets/${id}/comments/`, { text })
+}
+
+export const deleteTicketComment = (ticketId, commentId) => {
+  return apiClientInstance.delete(`/helpdesk/tickets/${ticketId}/comments/${commentId}/`)
+}
+
+export const getTicketDetails = (id) => {
+  return apiClientInstance.get(`/helpdesk/tickets/${id}/`)
+}

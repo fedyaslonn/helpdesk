@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useAuth } from "../auth/AuthContext"
 import { apiClientInstance } from "../api/ApiClient"
-import { getMembers } from "../services/ticket-management-api.jsx"
+import { getMembers, getTicketComments, removeTicketAssignee, updateTicketStatus, addTicketComment, deleteTicketComment, getTicketDetails } from "../services/ticket-management-api.jsx"
 import "../styles/TicketDetails.css"
 import "../styles/Comments.css"
 
@@ -118,7 +118,7 @@ const TicketDetail = () => {
       setIsAssigning(true)
       setAssignError(null)
 
-      const response = await apiClientInstance.post(`/helpdesk/tickets/${id}/remove_assignee/`, {})
+      const response = await removeTicketAssignee(id)
 
       setTicket(response.data)
       setAssignSuccess("Assignee removed successfully")
@@ -140,14 +140,13 @@ const TicketDetail = () => {
     }
   }
 
-  // Comments API functions
   const fetchComments = async () => {
     if (!id) return
 
     try {
       setIsCommentsLoading(true)
       setCommentsError(null)
-      const response = await apiClientInstance.get(`/helpdesk/tickets/${id}/comments/`)
+      const response = await getTicketComments(id)
       setComments(response.data)
     } catch (err) {
       setCommentsError("Failed to load comments")
@@ -164,7 +163,7 @@ const TicketDetail = () => {
         setIsLoading(true)
         setError(null)
 
-        const response = await apiClientInstance.get(`/helpdesk/tickets/${id}/`)
+        const response = await getTicketDetails(id)
         const ticketData = response.data
         setTicket(ticketData)
 
@@ -280,9 +279,7 @@ const TicketDetail = () => {
       setIsUpdating(true)
       setStatusUpdateError(null)
 
-      const response = await apiClientInstance.patch(`/helpdesk/tickets/${id}/`, {
-        status: newStatus,
-      })
+      const response = await updateTicketStatus(id, newStatus)
 
       setTicket((prev) => ({ ...prev, status: newStatus }))
 
@@ -326,9 +323,7 @@ const TicketDetail = () => {
     if (!newComment.trim()) return
 
     try {
-      const response = await apiClientInstance.post(`/helpdesk/tickets/${id}/comments/`, {
-        text: newComment,
-      })
+        const response = await addTicketComment(id, newComment)
 
       setComments([response.data, ...comments])
       setNewComment("")
@@ -342,9 +337,7 @@ const TicketDetail = () => {
     if (!editingCommentText.trim()) return
 
     try {
-      const response = await apiClientInstance.patch(`/helpdesk/tickets/${id}/comments/${commentId}/`, {
-        text: editingCommentText,
-      })
+      const response = await updateTicketComment(id, commentId, editingCommentText)
 
       setComments(comments.map((comment) => (comment.id === commentId ? response.data : comment)))
       setEditingCommentId(null)
