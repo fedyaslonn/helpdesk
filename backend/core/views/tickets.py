@@ -143,9 +143,7 @@ class TicketsViewSet(viewsets.ViewSet):
 
     def update(self, request, pk=None):
         try:
-            ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
-            ).get(pk=pk)
+            ticket = self.retrieve(pk=pk)
 
         except ObjectDoesNotExist:
             return Response(
@@ -192,9 +190,7 @@ class TicketsViewSet(viewsets.ViewSet):
 
     def partial_update(self, request, pk=None):
         try:
-            ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
-            ).get(pk=pk)
+            ticket = self.retrieve(pk=pk)
 
         except ObjectDoesNotExist as e:
             return Response(
@@ -250,7 +246,7 @@ class TicketsViewSet(viewsets.ViewSet):
 
     def destroy(self, request, pk=None):
         try:
-            ticket = Ticket.objects.get(pk=pk)
+            ticket = self.retrieve(pk=pk)
 
             if not request.user.is_authenticated:
                 return Response(
