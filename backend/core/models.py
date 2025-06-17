@@ -9,6 +9,25 @@ from django.utils.translation import gettext_lazy as _
 # Create your models here.
 
 
+class MembershipManager(models.Manager):
+    def is_worker_on_shift(self, user, organization):
+        now = timezone.now().time()
+        try:
+            membership = self.get(user=user, organization=organization, is_active=True)
+        except self.model.DoesNotExist:
+            return False
+
+        if not membership.shift_start or not membership.shift_end:
+            return False
+
+        shift_start = membership.shift_start
+        shift_end = membership.shift_end
+
+        if shift_start <= shift_end:
+            return shift_start <= now <= shift_end
+        return now >= shift_start or now <= shift_end
+
+
 class TicketManager(models.Manager):
     def get_current_shift_users(self, organization):
         now = timezone.now().time()
@@ -212,6 +231,8 @@ class Membership(models.Model):
 
     resolved_tickets_count = models.PositiveIntegerField(default=0)
     last_ticket_resolved_at = models.DateTimeField(null=True, blank=True)
+
+    objects = MembershipManager()
 
     class Meta:
         verbose_name = _("Membership")
