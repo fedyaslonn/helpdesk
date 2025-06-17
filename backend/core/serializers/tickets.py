@@ -1,3 +1,5 @@
+from datetime import timezone
+
 from django.core.validators import MinLengthValidator
 from rest_framework import serializers
 
@@ -123,6 +125,7 @@ class PartialUpdateTicketSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         user = request.user
         ticket = self.instance
+        current_time = timezone.now().time()
 
         if not user.is_authenticated:
             raise serializers.ValidationError("User is not authenticated.")
@@ -147,6 +150,29 @@ class PartialUpdateTicketSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "Only organization admins or the assignee can change the status"
                 )
+
+            if is_assignee and not is_org_admin:
+                membership = Membership.objects.filter(
+                    user=user, organization=ticket.organization, is_active=True
+                ).first()
+
+                if membership and membership.shift_start and membership.shift_end:
+                    shift_start = membership.shift_start
+                    shift_end = membership.shift_end
+
+                    if shift_start <= shift_end:
+
+                        if not (shift_start <= current_time <= shift_end):
+                            raise serializers.ValidationError(
+                                "You can only change status during your working shift"
+                            )
+                    else:
+                        if not (
+                            current_time >= shift_start or current_time <= shift_end
+                        ):
+                            raise serializers.ValidationError(
+                                "You can only change status during your working shift"
+                            )
 
             if attrs["status"] == ticket.status:
                 raise serializers.ValidationError(
