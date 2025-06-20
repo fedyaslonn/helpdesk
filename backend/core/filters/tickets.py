@@ -8,11 +8,8 @@ class TicketFilter(filters.FilterSet):
         choices=Ticket.Status.choices,
         field_name="status",
     )
-    assignee = filters.ModelMultipleChoiceFilter(
-        queryset=User.objects.all(),
-        field_name="assignee__username",
-        to_field_name="username",
-        lookup_expr="iexact",
+    assignee = filters.CharFilter(
+        method='filter_by_assignee_username'
     )
 
     class Meta:
@@ -22,9 +19,11 @@ class TicketFilter(filters.FilterSet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        if hasattr(self, "request") and self.request.user.is_authenticated:
-            self.filters["assignee"].always_filter = False
+    def filter_by_assignee_username(self, queryset, name, value):
+        if value == 'unassigned':
+            return queryset.filter(assignee__isnull=True)
 
-            self.filters["assignee"].queryset = User.objects.filter(
-                organization=self.request.user.organization
-            )
+        elif value:
+            return queryset.filter(assignee__username__iexact=value)
+
+        return queryset
