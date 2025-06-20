@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket Resolution Approved</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: #4CAF50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .ticket-info {
+            margin: 20px 0;
+        }
+        .ticket-info div {
+            margin: 10px 0;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 20px;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        .footer {
+            background: #f1f1f1;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+        a {
+            color: #4CAF50;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>Ticket Resolution Approved</h1>
+        </div>
+        <div class="content">
+            <div class="status-badge">✓ Approved</div>
+
+            <div class="ticket-info">
+                <div><strong>Title:</strong> {{ ticket_title }}</div>
+                <div><strong>Organization:</strong> {{ organization }}</div>
+                <div><strong>Requestor:</strong> {{ requestor_name }}</div>
+                <div><strong>Assignee:</strong> {{ assignee_name }}</div>
+                <div><strong>Approved at:</strong> {{ approval_time }}</div>
+            </div>
+
+            <p>Dear {{ assignee_name }},</p>
+            <p>The resolution for ticket <strong>{{ ticket_title }}</strong> has been approved by {{ requestor_name }}. This ticket is now marked as resolved in the {{ organization }} organization.</p>
+
+            <p class="footer-text">This is an automated notification. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
