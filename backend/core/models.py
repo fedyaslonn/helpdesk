@@ -1,7 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinLengthValidator
 from django.db import models, transaction
-from django.db.models import F, Q, Value
+from django.db.models import F, Q, Value, Min
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -70,11 +70,16 @@ class TicketManager(models.Manager):
             if not candidates.exists():
                 return self.assign_to_admin(ticket)
 
-            best_candidate = (
-                candidates.select_related("user")
-                .order_by("resolved_tickets_count", "last_ticket_resolved_at")
-                .first()
-            )
+            min_active = candidates.aggregate(
+                min_active=Min('active_tickets')
+            )['min_active']
+
+            best_candidates = candidates.filter(active_tickets=min_active)
+
+            best_candidate = best_candidates.order_by(
+                models.F('last_ticket_resolved_at').asc(nulls_last=True),
+                'id'
+            ).first()
 
             if best_candidate:
                 ticket.assignee = best_candidate.user
@@ -94,9 +99,16 @@ class TicketManager(models.Manager):
             ticket.assignee = admin.user
             admin.active_tickets_count = models.F("active_tickets_count") + 1
             admin.save()
+            ticket.save()
 
         return ticket
 
+    def active_tickets_for_user(self, user, organization):
+        return self.get_queryset().filter(
+            (Q(assignee=user) | Q(requestor=user)),
+            organization=organization,
+            status__in=[Ticket.Status.OPEN, Ticket.Status.IN_PROGRESS, Ticket.Status.WAITING_FOR_REQUESTOR]
+            )
 
 class TimestampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -153,6 +165,7 @@ class User(AbstractUser):
         blank=True,
     )
     date_birth = models.DateField(auto_now_add=False, null=True, blank=True)
+    last_organization_leave = models.DateTimeField(null=True, blank=True)
 
     USERNAME_FIELD = "username"
     REQUIRED_FIELDS = ["email"]
@@ -203,6 +216,11 @@ class Ticket(TimestampedModel):
         default=Status.OPEN,
     )
 
+    resolution_approved = models.BooleanField(
+        default=False,
+        verbose_name=_("Resolution approved by requestor")
+    )
+
     objects = TicketManager()
 
     class Meta:
@@ -239,15 +257,6 @@ class Membership(models.Model):
         verbose_name_plural = _("Memberships")
         db_table = "Membership"
 
-        unique_together = [("user", "organization")]
-
-        constraints = [
-            models.UniqueConstraint(
-                fields=["organization"],
-                condition=Q(role="admin", is_active=True),
-                name="unique_active_admin_per_organization",
-            )
-        ]
 
 
 class Comment(TimestampedModel):
@@ -268,3 +277,40 @@ class Comment(TimestampedModel):
 
     def __str__(self):
         return f"Comment from {self.author} to ticket {self.ticket.title}"
+
+
+class Application(TimestampedModel):
+    class Status(models.TextChoices):
+        PENDING = 'pending', _('Pending')
+        APPROVED = 'approved', _('Approved')
+        REJECTED = 'rejected', _('Rejected')
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='applications'
+    )
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name='applications'
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.PENDING
+    )
+    applied_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Application")
+        verbose_name_plural = _("Applications")
+        db_table = "Application"
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'organization'],
+                condition=Q(status='pending'),
+                name='unique_pending_application'
+            )
+        ]
