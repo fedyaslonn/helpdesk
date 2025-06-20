@@ -291,11 +291,11 @@ class TicketsViewSet(viewsets.ViewSet):
             context = {"request": request, "ticket": ticket}
             data = request.data.copy()
 
-            if 'old_assignee' in data and 'new_assignee' in data:
+            if "old_assignee" in data and "new_assignee" in data:
                 serializer_class = ChangeAssigneeSerializer
 
-            elif 'new_assignee' in data:
-                data['assignee'] = data['new_assignee']
+            elif "new_assignee" in data:
+                data["assignee"] = data["new_assignee"]
                 serializer_class = SetAssigneeSerializer
 
             else:
@@ -307,10 +307,7 @@ class TicketsViewSet(viewsets.ViewSet):
 
             else:
                 serializer = serializer_class(
-                    instance=ticket,
-                    data=data,
-                    context=context,
-                    partial=False
+                    instance=ticket, data=data, context=context, partial=False
                 )
 
             try:
@@ -324,16 +321,16 @@ class TicketsViewSet(viewsets.ViewSet):
                 old_assignee = ticket.assignee
 
                 if serializer_class == ChangeAssigneeSerializer:
-                    ticket.assignee = validated_data['new_assignee']
-                    operation = 'change'
+                    ticket.assignee = validated_data["new_assignee"]
+                    operation = "change"
 
                 elif serializer_class == SetAssigneeSerializer:
-                    ticket.assignee = validated_data['assignee']
-                    operation = 'set'
+                    ticket.assignee = validated_data["assignee"]
+                    operation = "set"
 
                 elif serializer_class == RemoveAssigneeSerializer:
                     ticket.assignee = None
-                    operation = 'remove'
+                    operation = "remove"
 
                 ticket.save()
 
@@ -341,7 +338,9 @@ class TicketsViewSet(viewsets.ViewSet):
                 new_assignee_id = ticket.assignee.id if ticket.assignee else None
 
                 transaction.on_commit(
-                    lambda: self.send_notification(operation, ticket.id, old_assignee_id, new_assignee_id)
+                    lambda: self.send_notification(
+                        operation, ticket.id, old_assignee_id, new_assignee_id
+                    )
                 )
 
         except PermissionDenied as e:
@@ -378,15 +377,15 @@ class TicketsViewSet(viewsets.ViewSet):
         return Response(data=response.data, status=status.HTTP_200_OK)
 
     def send_notification(self, operation, ticket_id, old_assignee_id, new_assignee_id):
-        if operation == 'change':
+        if operation == "change":
             send_change_assignee_notification.delay(
                 ticket_id, old_assignee_id, new_assignee_id
             )
 
-        elif operation == 'set':
+        elif operation == "set":
             send_set_assignee_notification.delay(ticket_id, new_assignee_id)
 
-        elif operation == 'remove':
+        elif operation == "remove":
             send_remove_assignee_notification.delay(ticket_id, old_assignee_id)
 
     def get_queryset(self):

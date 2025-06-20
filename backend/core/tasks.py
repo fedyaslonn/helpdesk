@@ -9,8 +9,8 @@ from django.utils.html import strip_tags
 
 from core.services.email import (
     send_new_assignee_email,
+    send_status_change_email,
     send_unassign_email,
-    send_status_change_email
 )
 
 from .models import Ticket
@@ -91,7 +91,6 @@ def send_set_assignee_notification(self, ticket_id, new_assignee_id):
         new_assignee = User.objects.get(pk=new_assignee_id)
 
         send_new_assignee_email(ticket, new_assignee)
-
 
     except Ticket.DoesNotExist:
         logger.error(f"Ticket {ticket_id} not found")

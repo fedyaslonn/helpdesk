@@ -19,7 +19,9 @@ def on_task_prerun(sender=None, task_id=None, **kwargs):
 
 @task_success.connect()
 def on_task_success(sender=None, task_id=None, result=None, **kwargs):
-    logger.info(f"Task {task_id} ({sender.name}) completed successfully. Result: {result}")
+    logger.info(
+        f"Task {task_id} ({sender.name}) completed successfully. Result: {result}"
+    )
 
 
 @task_failure.connect()

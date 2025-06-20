@@ -1,9 +1,11 @@
+import logging
+
+from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
-from django.conf import settings
+
 from core.models import Ticket, User
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,9 @@ def send_unassign_email(ticket, old_assignee):
 
     email.attach_alternative(html_content, "text/html")
     email.send()
-    logger.info(f"Unassignment email sent to {old_assignee.email} for ticket {ticket.id}")
+    logger.info(
+        f"Unassignment email sent to {old_assignee.email} for ticket {ticket.id}"
+    )
 
 
 def send_status_change_email(ticket, old_status, new_status, recipients):
