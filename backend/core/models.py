@@ -138,16 +138,6 @@ class Membership(models.Model):
         verbose_name_plural = _("Memberships")
         db_table = "Membership"
 
-        unique_together = [("user", "organization")]
-
-        constraints = [
-            models.UniqueConstraint(
-                fields=["organization"],
-                condition=Q(role="admin", is_active=True),
-                name="unique_active_admin_per_organization",
-            )
-        ]
-
 
 class Comment(TimestampedModel):
     ticket = models.ForeignKey(
