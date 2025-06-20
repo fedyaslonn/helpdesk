@@ -47,7 +47,9 @@ class TicketsViewSet(viewsets.ViewSet):
         try:
             user = self.request.user
             ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
+                "requestor",
+                "assignee",
+                "organization",
             ).get(pk=pk)
 
             is_requestor = ticket.requestor == user
@@ -144,7 +146,9 @@ class TicketsViewSet(viewsets.ViewSet):
     def update(self, request, pk=None):
         try:
             ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
+                "requestor",
+                "assignee",
+                "organization",
             ).get(pk=pk)
 
         except ObjectDoesNotExist:
