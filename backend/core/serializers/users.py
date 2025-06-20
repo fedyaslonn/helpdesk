@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from core.models import User
+from core.models import User, Membership, User, Organization
 
 
 class GetUserSerializer(serializers.ModelSerializer):
@@ -103,3 +103,41 @@ class PartialUpdateUserSerializer(serializers.ModelSerializer):
         if value > date.today():
             raise serializers.ValidationError("Birth date cannot be in the future")
         return value
+
+
+class ShiftSerializer(serializers.Serializer):
+    shift_start = serializers.TimeField(required=False, allow_null=True)
+    shift_end = serializers.TimeField(required=False, allow_null=True)
+
+
+class AdminAssignmentSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField(required=True)
+    organization_id = serializers.IntegerField(required=True)
+
+    def validate(self, attrs):
+        user_id = attrs['user_id']
+        organization_id = attrs['organization_id']
+        request_user = self.context['request'].user
+
+        try:
+            organization = Organization.objects.get(id=organization_id)
+
+        except Organization.DoesNotExist:
+            raise serializers.ValidationError("Organization does not exist")
+
+        if not Membership.objects.filter(
+                user=request_user,
+                organization=organization,
+                role=Membership.Role.ADMIN,
+                is_active=True
+        ).exists():
+            raise serializers.ValidationError("Only organization admins can assign roles")
+
+        if not Membership.objects.filter(
+                user=user_id,
+                organization=organization,
+                is_active=True
+        ).exists():
+            raise serializers.ValidationError("User is not a member of this organization")
+
+        return attrs
