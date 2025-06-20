@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
 
@@ -274,7 +274,7 @@ class TicketsViewSet(viewsets.ViewSet):
             )
 
     @action(detail=True, methods=["post"])
-    def change_assignee(self, request, pk=None):
+    def assign(self, request, pk=None):
         try:
             ticket = Ticket.objects.select_related(
                 "requestor", "assignee", "organization"
@@ -286,17 +286,32 @@ class TicketsViewSet(viewsets.ViewSet):
                 role=Membership.Role.ADMIN,
                 is_active=True,
             ).exists():
-                return Response(
-                    {"error": "Only organization admins can change assignee"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+                raise PermissionDenied("Only organization admins can modify assignees")
 
-            serializer = ChangeAssigneeSerializer(
-                instance=ticket,
-                data=request.data,
-                partial=False,
-                context={"request": request, "ticket": ticket},
-            )
+            context = {"request": request, "ticket": ticket}
+            data = request.data.copy()
+
+            if 'old_assignee' in data and 'new_assignee' in data:
+                serializer_class = ChangeAssigneeSerializer
+
+            elif 'new_assignee' in data:
+                data['assignee'] = data['new_assignee']
+                serializer_class = SetAssigneeSerializer
+
+            else:
+                serializer_class = RemoveAssigneeSerializer
+                data = {}
+
+            if serializer_class == RemoveAssigneeSerializer:
+                serializer = serializer_class(data={}, context=context)
+
+            else:
+                serializer = serializer_class(
+                    instance=ticket,
+                    data=data,
+                    context=context,
+                    partial=False
+                )
 
             try:
                 serializer.is_valid(raise_exception=True)
@@ -307,14 +322,33 @@ class TicketsViewSet(viewsets.ViewSet):
 
             with transaction.atomic():
                 old_assignee = ticket.assignee
-                ticket.assignee = validated_data["new_assignee"]
+
+                if serializer_class == ChangeAssigneeSerializer:
+                    ticket.assignee = validated_data['new_assignee']
+                    operation = 'change'
+
+                elif serializer_class == SetAssigneeSerializer:
+                    ticket.assignee = validated_data['assignee']
+                    operation = 'set'
+
+                elif serializer_class == RemoveAssigneeSerializer:
+                    ticket.assignee = None
+                    operation = 'remove'
+
                 ticket.save()
 
+                old_assignee_id = old_assignee.id if old_assignee else None
+                new_assignee_id = ticket.assignee.id if ticket.assignee else None
+
                 transaction.on_commit(
-                    lambda: send_change_assignee_notification.delay(
-                        ticket.id, old_assignee.id, ticket.assignee.id
-                    )
+                    lambda: self.send_notification(operation, ticket.id, old_assignee_id, new_assignee_id)
                 )
+
+        except PermissionDenied as e:
+            return Response(
+                {"error": f"{str(e)}"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         except Ticket.DoesNotExist:
             return Response(
@@ -341,102 +375,19 @@ class TicketsViewSet(viewsets.ViewSet):
             )
 
         response = GetTicketSerializer(ticket)
-
         return Response(data=response.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["post"])
-    def remove_assignee(self, request, pk=None):
-        try:
-            ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
-            ).get(pk=pk)
-
-            if not Membership.objects.filter(
-                user=request.user,
-                organization=ticket.organization,
-                role=Membership.Role.ADMIN,
-                is_active=True,
-            ).exists():
-                return Response(
-                    {"error": "Only organization admins can remove assignee"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            serializer = RemoveAssigneeSerializer(data={}, context={"ticket": ticket})
-
-            old_assignee = ticket.assignee
-
-            try:
-                serializer.is_valid(raise_exception=True)
-                validated_data = serializer.validated_data
-
-            except ValidationError as e:
-                return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
-
-            with transaction.atomic():
-                ticket.assignee = None
-                ticket.save()
-
-                transaction.on_commit(
-                    lambda: send_remove_assignee_notification.delay(
-                        ticket.id, old_assignee.id
-                    )
-                )
-
-        except Ticket.DoesNotExist:
-            return Response(
-                {"error": "Ticket not found"},
-                status=status.HTTP_404_NOT_FOUND,
+    def send_notification(self, operation, ticket_id, old_assignee_id, new_assignee_id):
+        if operation == 'change':
+            send_change_assignee_notification.delay(
+                ticket_id, old_assignee_id, new_assignee_id
             )
 
-        response = GetTicketSerializer(ticket)
-        return Response(data=response.data, status=status.HTTP_200_OK)
+        elif operation == 'set':
+            send_set_assignee_notification.delay(ticket_id, new_assignee_id)
 
-    @action(detail=True, methods=["post"])
-    def set_assignee(self, request, pk=None):
-        try:
-            ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
-            ).get(pk=pk)
-
-            if not Membership.objects.filter(
-                user=request.user,
-                organization=ticket.organization,
-                role=Membership.Role.ADMIN,
-                is_active=True,
-            ).exists():
-                return Response(
-                    {"error": "Only organization admins can set assignee"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            serializer = SetAssigneeSerializer(ticket, data=request.data)
-
-            try:
-                serializer.is_valid(raise_exception=True)
-                validated_data = serializer.validated_data
-
-            except ValidationError as e:
-                return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
-
-            with transaction.atomic():
-                ticket.assignee = validated_data.get("assignee")
-                ticket.save()
-
-                transaction.on_commit(
-                    lambda: send_set_assignee_notification.delay(
-                        ticket.id, ticket.assignee.id
-                    )
-                )
-
-        except Ticket.DoesNotExist:
-            return Response(
-                {"error": "Ticket not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        response = GetTicketSerializer(ticket)
-        return Response(data=response.data, status=status.HTTP_200_OK)
+        elif operation == 'remove':
+            send_remove_assignee_notification.delay(ticket_id, old_assignee_id)
 
     def get_queryset(self):
         user = self.request.user
