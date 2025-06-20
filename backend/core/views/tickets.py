@@ -444,7 +444,7 @@ class TicketsViewSet(viewsets.ViewSet):
         return Response(data=response.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['get'])
-    def admin_check(self, request, pk=None):
+    def check_admin(self, request, pk=None):
         if not request.user.is_authenticated:
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
 

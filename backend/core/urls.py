@@ -40,7 +40,7 @@ ticket_detail = TicketsViewSet.as_view(
 ticket_change_assignee = TicketsViewSet.as_view({"post": "change_assignee"})
 ticket_remove_assignee = TicketsViewSet.as_view({"post": "remove_assignee"})
 ticket_set_assignee = TicketsViewSet.as_view({"post": "set_assignee"})
-ticket_check_admin = TicketsViewSet.as_view({"get": "admin_check"})
+ticket_check_admin = TicketsViewSet.as_view({"get": "check_admin"})
 
 get_current_user = UsersViewSet.as_view({"get": "get_current_user"})
 
