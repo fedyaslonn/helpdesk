@@ -24,7 +24,10 @@ class SimpleTicketSerializer(serializers.ModelSerializer):
 class CreateTicketSerializer(serializers.ModelSerializer):
     organization = serializers.PrimaryKeyRelatedField(
         queryset=Organization.objects.all(),
-        error_messages={"organization": "Organization does not exist"},
+        error_messages={"does_not_exist": "Organization does not exist",
+                        "required": "Organization field is requeired",
+                        "null": "Organization cannot be null"
+                        },
     )
 
     description = serializers.CharField(
@@ -47,6 +50,26 @@ class CreateTicketSerializer(serializers.ModelSerializer):
             "description",
         ]
 
+    def validate(self, attrs):
+        request = self.context.get("request")
+
+        if not request or not request.user.is_authenticated:
+            raise serializers.ValidationError("User is not authenticated.")
+
+        organization = attrs.get("organization")
+
+        is_member = Membership.objects.filter(
+            user=request.user,
+            organization=organization,
+            is_active=True
+        ).exists()
+
+        if is_member:
+            raise serializers.ValidationError(
+                "You cannot create tickets for organizations where you are an active member."
+            )
+
+        return attrs
 
 class GetTicketSerializer(serializers.ModelSerializer):
     requestor = GetUserSerializer()
@@ -114,11 +137,13 @@ class PartialUpdateTicketSerializer(serializers.ModelSerializer):
         validators=[MinLengthValidator(2)],
         error_messages={"min_length": "Title must have at least 2 characters"},
     )
+
+    resolution_approved = serializers.BooleanField(required=False)
     status = serializers.ChoiceField(choices=Ticket.Status.choices, required=False)
 
     class Meta:
         model = Ticket
-        fields = ["description", "title", "status"]
+        fields = ["description", "title", "status", "resolution_approved"]
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -159,6 +184,11 @@ class PartialUpdateTicketSerializer(serializers.ModelSerializer):
                     shift_start = membership.shift_start
                     shift_end = membership.shift_end
 
+                    if not shift_start or not shift_end:
+                        raise serializers.ValidationError(
+                            "You can only change status during your working shift"
+                        )
+
                     if shift_start <= shift_end:
 
                         if not (shift_start <= current_time <= shift_end):
@@ -173,10 +203,34 @@ class PartialUpdateTicketSerializer(serializers.ModelSerializer):
                                 "You can only change status during your working shift"
                             )
 
+            if attrs["status"] == Ticket.Status.RESOLVED and not ticket.resolution_approved:
+                raise serializers.ValidationError(
+                    "Cannot resolve ticket without requestor's approval"
+                )
+
+            if ticket.status == Ticket.Status.RESOLVED and attrs["status"] != Ticket.Status.RESOLVED:
+                attrs["resolution_approved"] = False
+
             if attrs["status"] == ticket.status:
                 raise serializers.ValidationError(
                     {"status": "New statis must be different from old"}
                 )
+
+        if "resolution_approved" in attrs:
+            if ticket.requestor != user:
+                raise serializers.ValidationError(
+                    "Only the ticket creator can change resolution approval"
+                )
+
+            new_approval = attrs["resolution_approved"]
+
+            if ticket.status == Ticket.Status.RESOLVED and not new_approval:
+                raise serializers.ValidationError(
+                    "Cannot revoke approval for resolved tickets"
+                )
+
+            if new_approval and ticket.status != Ticket.Status.RESOLVED:
+                attrs["status"] = Ticket.Status.RESOLVED
 
         return attrs
 
@@ -221,14 +275,21 @@ class ChangeAssigneeSerializer(serializers.ModelSerializer):
     def validate_new_assignee(self, val):
         ticket = self.instance
 
-        if not Membership.objects.filter(
-            user=val, organization=ticket.organization, is_active=True
-        ).exists():
-            raise serializers.ValidationError(
-                {
-                    "new_assignee": "User is not an active member of the ticket's organization"
-                }
+        try:
+            membership = Membership.objects.get(
+                user=val,
+                organization=ticket.organization,
+                is_active=True
             )
+        except Membership.DoesNotExist:
+            raise serializers.ValidationError({
+                "new_assignee": "User is not an active member of the ticket's organization"
+            })
+
+        if membership.active_tickets_count >= 3:
+            raise serializers.ValidationError({
+                "new_assignee": "User already has 3 or more active tickets and cannot be assigned"
+            })
 
         return val
 
@@ -265,14 +326,21 @@ class SetAssigneeSerializer(serializers.ModelSerializer):
     def validate_assignee(self, val):
         ticket = self.instance
 
-        if not Membership.objects.filter(
-            user=val, organization=ticket.organization, is_active=True
-        ).exists():
-            raise serializers.ValidationError(
-                {
-                    "new_assignee": "User is not an active member of the ticket's organization"
-                }
+        try:
+            membership = Membership.objects.get(
+                user=val,
+                organization=ticket.organization,
+                is_active=True
             )
+        except Membership.DoesNotExist:
+            raise serializers.ValidationError({
+                "new_assignee": "User is not an active member of the ticket's organization"
+            })
+
+        if membership.active_tickets_count >= 3:
+            raise serializers.ValidationError({
+                "new_assignee": "User already has 3 or more active tickets and cannot be assigned"
+            })
 
         return val
 
