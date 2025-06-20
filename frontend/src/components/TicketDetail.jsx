@@ -2,7 +2,15 @@ import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useAuth } from "../auth/AuthContext"
 import { apiClientInstance } from "../api/ApiClient"
-import { getMembers, getTicketComments, removeTicketAssignee, updateTicketStatus, addTicketComment, deleteTicketComment, getTicketDetails } from "../services/ticket-management-api.jsx"
+import {
+  getMembers,
+  getTicketComments,
+  removeTicketAssignee,
+  updateTicketStatus,
+  addTicketComment,
+  getTicketDetails,
+  updateTicketComment,
+} from "../services/ticket-management-api.jsx"
 import "../styles/TicketDetails.css"
 import "../styles/Comments.css"
 
@@ -29,6 +37,7 @@ const TicketDetail = () => {
   const [newComment, setNewComment] = useState("")
   const [editingCommentId, setEditingCommentId] = useState(null)
   const [editingCommentText, setEditingCommentText] = useState("")
+  const [selectedStatus, setSelectedStatus] = useState("")
 
   const handleEditClick = () => {
     navigate(`/helpdesk/tickets/${id}/update`)
@@ -71,6 +80,40 @@ const TicketDetail = () => {
       } else {
         setAssignError("Loading error. Try again later")
       }
+    }
+  }
+
+  const handleApprove = async () => {
+    try {
+      setIsUpdating(true)
+      setStatusUpdateError(null)
+      setStatusUpdateSuccess(null)
+
+      const response = await apiClientInstance.patch(`/helpdesk/tickets/${id}/`, { resolution_approved: true })
+
+      setTicket(response.data)
+      setStatusUpdateSuccess("Resolution approved successfully! Ticket has been resolved.")
+
+      setTimeout(() => {
+        setStatusUpdateSuccess(null)
+      }, 5000)
+    } catch (err) {
+      console.error("Approval failed:", err)
+
+      let errorMessage = "Failed to approve resolution"
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error
+      } else if (err.response?.data?.non_field_errors) {
+        errorMessage = err.response.data.non_field_errors.join(", ")
+      } else if (err.response?.status === 400) {
+        errorMessage = "Invalid request. Please check the ticket status."
+      } else if (err.response?.status === 403) {
+        errorMessage = "You don't have permission to approve this resolution."
+      }
+
+      setStatusUpdateError(errorMessage)
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -156,7 +199,6 @@ const TicketDetail = () => {
     }
   }
 
-
   useEffect(() => {
     const fetchTicket = async () => {
       try {
@@ -220,7 +262,6 @@ const TicketDetail = () => {
     }
   }, [id, user])
 
-
   useEffect(() => {
     if (ticket && id) {
       fetchComments()
@@ -264,6 +305,19 @@ const TicketDetail = () => {
     )
   }
 
+  const getAvailableStatusTransitions = () => {
+    if (!ticket) return []
+    const currentStatus = ticket.status
+    const allStatuses = [
+      { value: "OP", label: "Open", icon: "🔴" },
+      { value: "IP", label: "In Progress", icon: "🟡" },
+      { value: "WR", label: "Waiting for Requestor", icon: "🔵" },
+      { value: "RS", label: "Resolved", icon: "🟢" },
+    ]
+
+    return allStatuses.filter((status) => status.value !== currentStatus)
+  }
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString("en-US", {
       year: "numeric",
@@ -279,17 +333,16 @@ const TicketDetail = () => {
       setIsUpdating(true)
       setStatusUpdateError(null)
 
-      const response = await updateTicketStatus(id, newStatus)
-
+      await updateTicketStatus(id, newStatus)
       setTicket((prev) => ({ ...prev, status: newStatus }))
 
       setStatusUpdateSuccess(`Status changed to ${getStatusConfig(newStatus).label}`)
       setTimeout(() => setStatusUpdateSuccess(null), 3000)
+
+      setSelectedStatus("")
     } catch (err) {
       console.error("Error updating status:", err)
-
       let errorMessage = "Failed to update status"
-
       if (err.response) {
         if (err.response.status === 400) {
           if (err.response.data?.status) {
@@ -301,7 +354,6 @@ const TicketDetail = () => {
           errorMessage = "You don't have permission to change the status"
         }
       }
-
       setStatusUpdateError(errorMessage)
     } finally {
       setIsUpdating(false)
@@ -319,11 +371,16 @@ const TicketDetail = () => {
     return ticket.requestor?.id === user.id
   }
 
+  const canApproveResolution = () => {
+    if (!ticket || !user) return false
+    return ticket.status === "WR" && ticket.requestor?.id === user.id
+  }
+
   const handleAddComment = async () => {
     if (!newComment.trim()) return
 
     try {
-        const response = await addTicketComment(id, newComment)
+      const response = await addTicketComment(id, newComment)
 
       setComments([response.data, ...comments])
       setNewComment("")
@@ -368,20 +425,6 @@ const TicketDetail = () => {
   const cancelEdit = () => {
     setEditingCommentId(null)
     setEditingCommentText("")
-  }
-
-  const getAvailableStatusTransitions = () => {
-    if (!ticket) return []
-
-    const currentStatus = ticket.status
-    const allStatuses = [
-      { value: "OP", label: "Open", icon: "🔴" },
-      { value: "IP", label: "In Progress", icon: "🟡" },
-      { value: "WR", label: "Waiting for Requestor", icon: "🔵" },
-      { value: "RS", label: "Resolved", icon: "🟢" },
-    ]
-
-    return allStatuses.filter((status) => status.value !== currentStatus)
   }
 
   if (isLoading) {
@@ -436,7 +479,6 @@ const TicketDetail = () => {
 
   return (
     <div className="ticket-detail-container">
-
       {isAssignModalOpen && (
         <div className="modal-overlay">
           <div className="assign-modal">
@@ -497,7 +539,6 @@ const TicketDetail = () => {
         </div>
       )}
 
-
       <div className="ticket-header">
         <div className="header-left">
           <button className="back-btn" onClick={() => navigate("/helpdesk/tickets")}>
@@ -539,9 +580,7 @@ const TicketDetail = () => {
         </div>
       </div>
 
-
       <div className="ticket-content">
-
         <div className="ticket-card main-card">
           <div className="card-header">
             <h1 className="ticket-title">{ticket.title}</h1>
@@ -553,7 +592,6 @@ const TicketDetail = () => {
         </div>
 
         <div className="content-grid">
-
           <div className="ticket-card description-card">
             <div className="card-header">
               <h3 className="card-title">
@@ -682,10 +720,71 @@ const TicketDetail = () => {
                   <span className="date-text">{formatDate(ticket.updated_at)}</span>
                 </div>
               </div>
+
+              {ticket.resolution_approved !== undefined && (
+                <div className="detail-row">
+                  <div className="detail-label">
+                    <svg className="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Resolution Approved
+                  </div>
+                  <div className="detail-value">
+                    <span className={`approval-status ${ticket.resolution_approved ? "approved" : "pending"}`}>
+                      {ticket.resolution_approved ? "✅ Yes" : "⏳ Pending"}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
+        {canApproveResolution() && (
+          <div className="ticket-card approval-card">
+            <div className="card-header">
+              <h3 className="card-title">
+                <svg className="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Resolution Approval Required
+              </h3>
+            </div>
+            <div className="card-content">
+              {statusUpdateError && <div className="alert alert-danger">{statusUpdateError}</div>}
+              {statusUpdateSuccess && <div className="alert alert-success">{statusUpdateSuccess}</div>}
+
+              <div className="approval-section">
+                <div className="approval-message">
+                  <p>
+                    <strong>The assignee has marked this ticket as resolved.</strong>
+                  </p>
+                  <p>
+                    Please review the resolution and confirm if the issue has been satisfactorily addressed. Approving
+                    will automatically close the ticket.
+                  </p>
+                </div>
+                <div className="approval-actions">
+                  <button className="btn btn-success btn-lg" onClick={handleApprove} disabled={isUpdating}>
+                    {isUpdating ? (
+                      <>
+                        <div className="btn-spinner"></div>
+                        Approving...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Approve Resolution
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {canUpdateTicket() && (
           <div className="ticket-card actions-card">
@@ -699,30 +798,44 @@ const TicketDetail = () => {
             </div>
             <div className="card-content">
               {statusUpdateError && <div className="alert alert-danger">{statusUpdateError}</div>}
-
               {statusUpdateSuccess && <div className="alert alert-success">{statusUpdateSuccess}</div>}
-
-              <div className="status-actions">
-                {getAvailableStatusTransitions().map((statusOption) => (
-                  <button
-                    key={statusOption.value}
-                    className={`status-action-btn ${statusOption.value.toLowerCase()}`}
-                    onClick={() => handleStatusChange(statusOption.value)}
-                    disabled={isUpdating}
-                  >
-                    <span className="action-icon">{statusOption.icon}</span>
-                    {isUpdating ? "Updating..." : `Mark ${statusOption.label}`}
-                  </button>
-                ))}
+              <div className="status-dropdown-container">
+                <label htmlFor="statusSelect">Change Status:</label>
+                <select
+                  id="statusSelect"
+                  className="form-select"
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  disabled={isUpdating}
+                >
+                  <option value="">Select new status</option>
+                  {getAvailableStatusTransitions().map((statusOption) => (
+                    <option key={statusOption.value} value={statusOption.value}>
+                      {statusOption.icon} {statusOption.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => handleStatusChange(selectedStatus)}
+                  disabled={isUpdating || !selectedStatus}
+                >
+                  {isUpdating ? "Updating..." : "Change Status"}
+                </button>
               </div>
             </div>
           </div>
         )}
 
-
         <div className="access-info">
           <div className="access-reason">
-            <svg className="access-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px' }} >
+            <svg
+              className="access-icon"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              style={{ width: "16px", height: "16px" }}
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -733,7 +846,7 @@ const TicketDetail = () => {
             <span>
               You have access to this ticket as{" "}
               {ticket.requestor?.id === user?.id
-                ? "the requestor (can edit)"
+                ? "the requestor (can edit and approve resolution)"
                 : ticket.assignee?.id === user?.id
                   ? "the assignee (can manage status)"
                   : isOrgAdmin
@@ -775,7 +888,6 @@ const TicketDetail = () => {
           <div className="card-content">
             {commentsError && <div className="alert alert-danger">{commentsError}</div>}
 
-
             {user && (
               <div className="new-comment-form">
                 <div className="comment-input-container">
@@ -810,7 +922,6 @@ const TicketDetail = () => {
               </div>
             )}
 
-
             <div className="comments-list">
               {isCommentsLoading ? (
                 <div className="comments-loading">
@@ -844,7 +955,12 @@ const TicketDetail = () => {
                                   onClick={() => handleUpdateComment(comment.id)}
                                   disabled={!editingCommentText.trim()}
                                 >
-                                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '20px', height: '20px' }} >
+                                  <svg
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                    style={{ width: "20px", height: "20px" }}
+                                  >
                                     <path
                                       strokeLinecap="round"
                                       strokeLinejoin="round"
@@ -854,7 +970,12 @@ const TicketDetail = () => {
                                   </svg>
                                 </button>
                                 <button className="comment-action-btn" onClick={cancelEdit}>
-                                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '20px', height: '20px' }} >
+                                  <svg
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                    style={{ width: "20px", height: "20px" }}
+                                  >
                                     <path
                                       strokeLinecap="round"
                                       strokeLinejoin="round"
@@ -867,7 +988,12 @@ const TicketDetail = () => {
                             ) : (
                               <>
                                 <button className="comment-action-btn" onClick={() => startEdit(comment)}>
-                                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '20px', height: '20px' }} >
+                                  <svg
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                    style={{ width: "20px", height: "20px" }}
+                                  >
                                     <path
                                       strokeLinecap="round"
                                       strokeLinejoin="round"
@@ -880,7 +1006,12 @@ const TicketDetail = () => {
                                   className="comment-action-btn delete"
                                   onClick={() => handleDeleteComment(comment.id)}
                                 >
-                                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '20px', height: '20px' }} >
+                                  <svg
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                    style={{ width: "20px", height: "20px" }}
+                                  >
                                     <path
                                       strokeLinecap="round"
                                       strokeLinejoin="round"

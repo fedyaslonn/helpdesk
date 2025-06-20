@@ -27,6 +27,13 @@ const TicketCreateForm = () => {
         const orgsResponse = await getOrganizations()
         setOrganizations(orgsResponse.data);
 
+      if (orgsResponse.data.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          organization: orgsResponse.data[0].id.toString()
+        }));
+      }
+
         const usersResponse = await getUsers()
         setUsers(usersResponse.data);
 
@@ -51,6 +58,10 @@ const TicketCreateForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.organization) {
+        setError('Organization is required');
+       return;
+    }
     setIsSubmitting(true)
     try {
       const ticketData = {
@@ -59,7 +70,7 @@ const TicketCreateForm = () => {
         assignee: formData.assignee ? parseInt(formData.assignee) : null,
         organization: parseInt(formData.organization)
       };
-            await createTicket(ticketData)
+  await createTicket(ticketData)
       navigate('/helpdesk/tickets')
     } catch (err) {
       setError('Failed to create ticket')
