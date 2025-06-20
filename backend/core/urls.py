@@ -4,6 +4,7 @@ from core.views.comments import CommentsViewSet
 from core.views.organizations import OrganizationsViewSet
 from core.views.tickets import TicketsViewSet
 from core.views.users import UsersViewSet
+from core.views.applications import ApplicationsViewSet
 
 user_list = UsersViewSet.as_view({"get": "list", "post": "create"})
 
@@ -42,6 +43,13 @@ ticket_remove_assignee = TicketsViewSet.as_view({"post": "remove_assignee"})
 ticket_set_assignee = TicketsViewSet.as_view({"post": "set_assignee"})
 ticket_check_admin = TicketsViewSet.as_view({"get": "admin_check"})
 
+users_apply_for_organization = UsersViewSet.as_view({"post": "apply_for_organization"})
+users_update_shift = UsersViewSet.as_view({"post": "update_shift"})
+
+applications_list = ApplicationsViewSet.as_view({"get": "organization_applications"})
+accept_application = ApplicationsViewSet.as_view({"post": "accept_application"})
+reject_application = ApplicationsViewSet.as_view({"post": "reject_application"})
+
 get_current_user = UsersViewSet.as_view({"get": "get_current_user"})
 
 urlpatterns = [
@@ -53,7 +61,7 @@ urlpatterns = [
         name="user-update-password",
     ),
     path(
-        "users/<int:pk>/set_organization/",
+        "users/<int:pk>/d/",
         user_set_organization,
         name="user-set-organization",
     ),
@@ -61,6 +69,11 @@ urlpatterns = [
         "users/<int:pk>/leave_organization/",
         user_leave_organization,
         name="user-leave-organization",
+    ),
+    path(
+        "users/<int:pk>/apply_for_organization/",
+        users_apply_for_organization,
+        name="apply-for-organization",
     ),
     path(
         "organizations/organizations_list/", organization_list, name="organization-list"
@@ -101,5 +114,21 @@ urlpatterns = [
         "organizations/<int:pk>/members/",
         organization_get_members,
         name="organizations-members",
+    ),
+    path("users/<int:pk>/update_shifts/", users_update_shift, name="update-shift"),
+    path(
+        "applications/organization_applications/",
+        applications_list,
+        name="organization-applications"
+    ),
+    path(
+        "applications/<int:pk>/accept_application/",
+        accept_application,
+        name="accept-application"
+    ),
+    path(
+        "applications/<int:pk>/reject_application/",
+        reject_application,
+        name="reject-application"
     ),
 ]

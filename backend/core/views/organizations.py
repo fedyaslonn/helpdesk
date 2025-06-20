@@ -124,6 +124,12 @@ class OrganizationsViewSet(viewsets.ViewSet):
                 {"error": "Organization not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
+        except PermissionDenied as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         except ValidationError as e:
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -176,6 +182,12 @@ class OrganizationsViewSet(viewsets.ViewSet):
                 setattr(organization, attr, value)
 
             organization.save()
+
+        except PermissionDenied as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         except ValidationError as e:
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
@@ -232,6 +244,12 @@ class OrganizationsViewSet(viewsets.ViewSet):
                 status=status.HTTP_204_NO_CONTENT,
             )
 
+        except PermissionDenied as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         except ObjectDoesNotExist:
             return Response(
                 {"error": "Organization not found"}, status=status.HTTP_404_NOT_FOUND
@@ -258,7 +276,7 @@ class OrganizationsViewSet(viewsets.ViewSet):
     def get_queryset(self):
         return Organization.objects.prefetch_related("members").all()
 
-    @action(detail=False, methods=["get"])
+    @action(detail=True, methods=["get"])
     def get_members(self, request, pk=None):
         try:
             organization = get_object_or_404(Organization, pk=pk)
@@ -273,7 +291,7 @@ class OrganizationsViewSet(viewsets.ViewSet):
 
             try:
                 memberships = Membership.objects.filter(
-                    organization=request.user.organization, is_active=True
+                    organization=organization, is_active=True
                 ).select_related("user")
 
             except ObjectDoesNotExist:
