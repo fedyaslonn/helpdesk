@@ -161,7 +161,6 @@ class PartialUpdateTicketSerializer(serializers.ModelSerializer):
                     shift_end = membership.shift_end
 
                     if shift_start <= shift_end:
-
                         if not (shift_start <= current_time <= shift_end):
                             raise serializers.ValidationError(
                                 "You can only change status during your working shift"

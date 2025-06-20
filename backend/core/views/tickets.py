@@ -476,7 +476,8 @@ class TicketsViewSet(viewsets.ViewSet):
 
         except Ticket.DoesNotExist:
             return Response(
-                {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": "Ticket not found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
     def get_queryset(self):
