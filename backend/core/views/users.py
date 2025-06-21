@@ -3,7 +3,7 @@ import logging
 from django.utils import timezone
 from django.contrib.auth.hashers import check_password
 from django.db import DatabaseError, IntegrityError
-from django.db.models import ObjectDoesNotExist, Prefetch, Q
+from django.db.models import ObjectDoesNotExist, Prefetch, Q, Count
 from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -167,6 +167,11 @@ class UsersViewSet(viewsets.ViewSet):
         except ObjectDoesNotExist as e:
             return Response(
                 {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        if request.user != user:
+            return Response(
+                {"error": "You can only update your own profile"},
+                status=status.HTTP_403_FORBIDDEN
             )
 
         serializer = PartialUpdateUserSerializer(data=request.data, partial=True)
@@ -406,12 +411,34 @@ class UsersViewSet(viewsets.ViewSet):
                     is_active=True
                 )
 
-                membership.is_active = False
-                membership.save()
+                if membership.role == Membership.Role.ADMIN:
+                    active_admins = Membership.objects.filter(
+                        organization=user.organization,
+                        role=Membership.Role.ADMIN,
+                        is_active=True
+                    ).exclude(user=user)
 
-                user.organization = None
-                user.last_organization_leave = timezone.now()
-                user.save()
+
+                    if not active_admins.exists():
+                        new_admin = Membership.objects.filter(
+                            organization=user.organization,
+                            is_active=True
+                        ).exclude(user=user).order_by('created_at').first()
+
+                        if new_admin:
+                            new_admin.role = Membership.Role.ADMIN
+                            new_admin.save()
+
+                        else:
+                            user.organization.is_active = False
+                            user.organization.save()
+
+                    membership.is_active = False
+                    membership.save()
+
+                    user.organization = None
+                    user.last_organization_leave = timezone.now()
+                    user.save()
 
         except Membership.DoesNotExist:
             return Response(
