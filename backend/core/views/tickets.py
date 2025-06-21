@@ -76,7 +76,7 @@ class TicketsViewSet(viewsets.ViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request):
-        serializer = CreateTicketSerializer(data=request.data)
+        serializer = CreateTicketSerializer(data=request.data, context={"request": request})
 
         try:
             serializer.is_valid(raise_exception=True)
