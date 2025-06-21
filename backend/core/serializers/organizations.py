@@ -58,8 +58,7 @@ class PartialUpdateOrganizationSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
-    is_active = serializers.BooleanField(required=False, allow_null=True)
 
     class Meta:
         model = Organization
-        fields = ["name", "email", "is_active"]
+        fields = ["name", "email"]
