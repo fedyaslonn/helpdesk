@@ -6,12 +6,18 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+
+from datetime import timedelta
+from datetime import datetime
+
 # Create your models here.
 
 
 class MembershipManager(models.Manager):
     def is_worker_on_shift(self, user, organization):
-        now = timezone.now().time()
+        now = timezone.localtime(timezone.now())
+        current_time = now.time()
+
         try:
             membership = self.get(user=user, organization=organization, is_active=True)
         except self.model.DoesNotExist:
@@ -24,8 +30,9 @@ class MembershipManager(models.Manager):
         shift_end = membership.shift_end
 
         if shift_start <= shift_end:
-            return shift_start <= now <= shift_end
-        return now >= shift_start or now <= shift_end
+            return shift_start <= current_time <= shift_end
+
+        return current_time >= shift_start or current_time <= shift_end
 
 
 class TicketManager(models.Manager):
@@ -232,7 +239,7 @@ class Ticket(TimestampedModel):
         return f"Ticket {self.id} - {self.title}"
 
 
-class Membership(models.Model):
+class Membership(TimestampedModel):
     class Role(models.TextChoices):
         ADMIN = "admin", _("Admin")
         WORKER = "worker", _("Worker")
