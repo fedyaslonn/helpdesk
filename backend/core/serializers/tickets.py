@@ -2,6 +2,8 @@ from django.utils import timezone
 from django.core.validators import MinLengthValidator
 from rest_framework import serializers
 
+from datetime import datetime
+
 from core.models import Membership, Organization, Ticket, User
 from core.serializers.comments import GetCommentSerializer
 from core.serializers.organizations import GetOrganizationSerializer
@@ -57,6 +59,9 @@ class CreateTicketSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("User is not authenticated.")
 
         organization = attrs.get("organization")
+
+        if not organization.is_active:
+            raise serializers.ValidationError("You cannot assign ticket to inactive organization")
 
         is_member = Membership.objects.filter(
             user=request.user,
@@ -149,7 +154,7 @@ class PartialUpdateTicketSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         user = request.user
         ticket = self.instance
-        current_time = timezone.now().time()
+        current_time = timezone.now().date()
 
         if not user.is_authenticated:
             raise serializers.ValidationError("User is not authenticated.")
@@ -180,28 +185,25 @@ class PartialUpdateTicketSerializer(serializers.ModelSerializer):
                     user=user, organization=ticket.organization, is_active=True
                 ).first()
 
-                if membership and membership.shift_start and membership.shift_end:
-                    shift_start = membership.shift_start
-                    shift_end = membership.shift_end
+                if not membership or not membership.shift_start or not membership.shift_end:
+                    raise serializers.ValidationError(
+                        "You must have a defined shift to change the status"
+                    )
 
-                    if not shift_start or not shift_end:
-                        raise serializers.ValidationError(
-                            "You can only change status during your working shift"
-                        )
+                now = timezone.localtime(timezone.now()).time()
+                shift_start = membership.shift_start
+                shift_end = membership.shift_end
 
-                    if shift_start <= shift_end:
 
-                        if not (shift_start <= current_time <= shift_end):
-                            raise serializers.ValidationError(
-                                "You can only change status during your working shift"
-                            )
-                    else:
-                        if not (
-                            current_time >= shift_start or current_time <= shift_end
-                        ):
-                            raise serializers.ValidationError(
-                                "You can only change status during your working shift"
-                            )
+                if shift_start <= shift_end:
+                    in_shift = shift_start <= now <= shift_end
+                else:
+                    in_shift = now >= shift_start or now <= shift_end
+
+                if not in_shift:
+                    raise serializers.ValidationError(
+                        "You can only change status during your working shift"
+                    )
 
             if attrs["status"] == Ticket.Status.RESOLVED and not ticket.resolution_approved:
                 raise serializers.ValidationError(
