@@ -434,12 +434,12 @@ class UsersViewSet(viewsets.ViewSet):
                             user.organization.is_active = False
                             user.organization.save()
 
-                    membership.is_active = False
-                    membership.save()
+                membership.is_active = False
+                membership.save()
 
-                    user.organization = None
-                    user.last_organization_leave = timezone.now()
-                    user.save()
+                user.organization = None
+                user.last_organization_leave = timezone.now()
+                user.save()
 
         except Membership.DoesNotExist:
             return Response(
