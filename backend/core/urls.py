@@ -45,6 +45,7 @@ ticket_check_admin = TicketsViewSet.as_view({"get": "admin_check"})
 
 users_apply_for_organization = UsersViewSet.as_view({"post": "apply_for_organization"})
 users_update_shift = UsersViewSet.as_view({"post": "update_shift"})
+users_assign_to_admin = UsersViewSet.as_view({"post": "assign_to_admin"})
 
 applications_list = ApplicationsViewSet.as_view({"get": "organization_applications"})
 accept_application = ApplicationsViewSet.as_view({"post": "accept_application"})
@@ -130,5 +131,10 @@ urlpatterns = [
         "applications/<int:pk>/reject_application/",
         reject_application,
         name="reject-application"
+    ),
+    path(
+        "users/<int:pk>/assign_to_admin/",
+        users_assign_to_admin,
+        name="assign-to-admin"
     ),
 ]
