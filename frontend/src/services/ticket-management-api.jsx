@@ -59,6 +59,8 @@ export const getTicketDetails = (id) => {
   return apiClientInstance.get(`/helpdesk/tickets/${id}/`)
 }
 
-export const updateTicketComment = (ticketId, commentId) => {
-    return apiClientInstance.patch(`/helpdesk/tickets/${ticketId}/comments/${commentId}/`)
+export const updateTicketComment = (ticketId, commentId, text) => {
+    return apiClientInstance.patch(`/helpdesk/tickets/${ticketId}/comments/${commentId}/`, {
+        text: text
+    })
 }

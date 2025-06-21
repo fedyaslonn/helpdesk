@@ -384,7 +384,6 @@
   }
 }
 
-/* Responsive Design */
 @media (max-width: 640px) {
   .create-organization-container {
     padding: 12px;

@@ -239,7 +239,6 @@
   }
 }
 
-/* Animation for filter changes */
 @keyframes filterChange {
   0% {
     transform: scale(1);

@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom";
 import "../styles/OrganizationsList.css"
-import { createOrganization, getOrganizations, applyForOrganization, leaveOrganizationAPI } from "../services/organization-management-api"
+import { getOrganizations, applyForOrganization, leaveOrganizationAPI } from "../services/organization-management-api"
 import { getCurrentUser } from "../services/ticket-management-api"
 
 function OrganizationsList() {
+  const navigate = useNavigate();
   const [organizations, setOrganizations] = useState([])
   const [currentUser, setCurrentUser] = useState(null)
   const [error, setError] = useState(null)
@@ -11,9 +13,9 @@ function OrganizationsList() {
   const [applicationStates, setApplicationStates] = useState({})
   const [applicationErrors, setApplicationErrors] = useState({})
   const [applicationSuccess, setApplicationSuccess] = useState({})
-const [isLeaving, setIsLeaving] = useState(false);
-const [leaveError, setLeaveError] = useState(null);
-const [leaveSuccess, setLeaveSuccess] = useState(null);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState(null);
+  const [leaveSuccess, setLeaveSuccess] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -34,6 +36,14 @@ const [leaveSuccess, setLeaveSuccess] = useState(null);
 
     fetchData()
   }, [])
+
+  const handleCreateOrganization = () => {
+    navigate("/organizations/create")
+  }
+
+  const handleViewMembers = (organizationId) => {
+    navigate(`/organizations/${organizationId}/members`)
+  }
 
   const handleApplyForOrganization = async (organizationId) => {
     if (!currentUser) return
@@ -71,32 +81,32 @@ const [leaveSuccess, setLeaveSuccess] = useState(null);
     }
   }
 
-const handleLeaveOrganization = async (organizationId) => {
-  if (!currentUser) return;
+  const handleLeaveOrganization = async (organizationId) => {
+    if (!currentUser) return;
 
-  setIsLeaving(true);
-  setLeaveError(null);
-  setLeaveSuccess(null);
+    setIsLeaving(true);
+    setLeaveError(null);
+    setLeaveSuccess(null);
 
-  try {
-    const response = await leaveOrganizationAPI(currentUser.id);
-    setCurrentUser(response.data);
-    setLeaveSuccess("Successfully left organization");
+    try {
+      const response = await leaveOrganizationAPI(currentUser.id);
+      setCurrentUser(response.data);
+      setLeaveSuccess("Successfully left organization");
 
-    setTimeout(() => {
-      setLeaveSuccess(null);
-    }, 3000);
-  } catch (err) {
-    console.error("Failed to leave organization:", err);
-    setLeaveError(err.response?.data?.error || "Failed to leave organization");
+      setTimeout(() => {
+        setLeaveSuccess(null);
+      }, 3000);
+    } catch (err) {
+      console.error("Failed to leave organization:", err);
+      setLeaveError(err.response?.data?.error || "Failed to leave organization");
 
-    setTimeout(() => {
-      setLeaveError(null);
-    }, 5000);
-  } finally {
-    setIsLeaving(false);
+      setTimeout(() => {
+        setLeaveError(null);
+      }, 5000);
+    } finally {
+      setIsLeaving(false);
+    }
   }
-}
 
   const canApplyToOrganization = (organization) => {
     if (!currentUser) return false
@@ -111,23 +121,43 @@ const handleLeaveOrganization = async (organizationId) => {
 
   if (error) return <div className="error-message">{error}</div>
   if (isLoading) return <div className="loading">Loading...</div>
-  if (organizations.length === 0) return <div className="no-data">No organizations found</div>
+  if (organizations.length === 0) return (
+    <div className="no-data">
+      <p>No organizations found</p>
+      <button
+        className="create-org-btn"
+        onClick={handleCreateOrganization}
+      >
+        Create New Organization
+      </button>
+    </div>
+  )
 
   return (
     <div className="organizations-container">
       <div className="organizations-header">
         <h1>Organizations List</h1>
-        {currentUser && (
-          <div className="user-status">
-            <p className="status-text">{getUserOrganizationStatus()}</p>
-          </div>
-        )}
+      </div>
+
+      <div className="create-org-container">
+        <button
+          className="create-org-btn"
+          onClick={handleCreateOrganization}
+        >
+          Create New Organization
+        </button>
       </div>
 
       {organizations.length === 0 ? (
         <div className="empty-state">
           <h3>No Organizations Found</h3>
           <p>There are currently no organizations to display.</p>
+          <button
+            className="create-org-btn"
+            onClick={handleCreateOrganization}
+          >
+            Create New Organization
+          </button>
         </div>
       ) : (
         <div className="organizations-table">
@@ -163,10 +193,16 @@ const handleLeaveOrganization = async (organizationId) => {
               </div>
 
               <div className="org-actions">
-                {currentUser?.organization?.id === org.id ? (
+                {currentUser?.organization?.id === org.id && (
+                  <button
+                    className="view-members-btn"
+                    onClick={() => handleViewMembers(org.id)}
+                  >
+                    View Members
+                  </button>
+                )}
+            {currentUser?.organization?.id === org.id ? (
                   <div className="current-org-actions">
-
-
                     <button
                       className="small-leave-btn"
                       onClick={handleLeaveOrganization}
@@ -222,6 +258,6 @@ const handleLeaveOrganization = async (organizationId) => {
       )}
     </div>
   )
-}
+  }
 
 export default OrganizationsList

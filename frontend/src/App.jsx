@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth, AuthContext, AuthProvider, LoginForm, LogOutButton } from './auth';
 
-import { UsersList, UserCreate, UserUpdate, TicketsPage, OrganizationsList, CreateOrganization, TicketCreateForm, ProtectedRoute, CreateComment, TicketDetail, EditTicket, ShiftManagement, OrganizationMembers, OrganizationApplications } from './components'
+import { UsersList, UserCreate, UserUpdate, TicketsPage, OrganizationsList, CreateOrganization, TicketCreateForm, ProtectedRoute, CreateComment, TicketDetail, EditTicket, ShiftManagement, OrganizationMembers, OrganizationApplications, UserProfile, OrganizationUpdate } from './components'
 import Layout from './components/Layout/Layout.jsx';
 
 
@@ -32,6 +32,7 @@ function App() {
             <Route path="users">
               <Route index element={<UsersList />} />
               <Route path="update/:id" element={<UserUpdate />} />
+              <Route path=":id/profile" element={<UserProfile />} />
             </Route>
 
             <Route path="organizations">
@@ -40,7 +41,9 @@ function App() {
               <Route path=":organizationId/members" element={<OrganizationMembers />} />
               <Route path="shift-management" element={<ShiftManagement />} />
               <Route path="applications" element={<OrganizationApplications />} />
+              <Route path="/organizations/:id/update" element={<OrganizationUpdate />} />
             </Route>
+
 
             <Route path="comments">
               <Route path="create" element={<CreateComment />} />

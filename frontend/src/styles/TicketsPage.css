@@ -377,7 +377,7 @@ body {
 }
 
 .ticket-form-header {
-  background-color: var(--primary-color);
+  background-color: #800080;
   color: white;
   padding: 2rem;
 }
@@ -509,7 +509,6 @@ body {
 }
 
 .btn-submit-enhanced {
-  background-color: var(--primary-color);
   border: none;
   border-radius: var(--radius);
   padding: 1rem 2rem;
