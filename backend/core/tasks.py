@@ -5,8 +5,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMultiAlternatives, send_mail
 from django.template.loader import render_to_string
-from django.utils.html import strip_tags
 from django.utils import timezone
+from django.utils.html import strip_tags
 
 from .models import Ticket
 
@@ -169,10 +169,10 @@ def send_set_assignee_notification(self, ticket_id, new_assignee_id):
 def send_apply_for_organization_notification(self, admin_email, username, org_name):
     try:
         subject = f"New application for {org_name}"
-        html_content = render_to_string('core/application_notification.html', {
-            'username': username,
-            'org_name': org_name
-        })
+        html_content = render_to_string(
+            "core/application_notification.html",
+            {"username": username, "org_name": org_name},
+        )
         text_content = strip_tags(html_content)
 
         email = EmailMultiAlternatives(
@@ -186,7 +186,7 @@ def send_apply_for_organization_notification(self, admin_email, username, org_na
         email.send(fail_silently=False)
 
     except Exception as e:
-        logger.error(f"Failed to send notification about apply to admin")
+        logger.error("Failed to send notification about apply to admin")
         self.retry(exc=e)
 
 
@@ -194,7 +194,7 @@ def send_apply_for_organization_notification(self, admin_email, username, org_na
 def send_resolution_approved_notification(self, ticket_id):
     try:
         ticket = Ticket.objects.select_related(
-            'organization', 'assignee', 'requestor'
+            "organization", "assignee", "requestor"
         ).get(id=ticket_id)
 
         assignee = ticket.assignee
@@ -205,15 +205,15 @@ def send_resolution_approved_notification(self, ticket_id):
             return
 
         context = {
-            'ticket_title': ticket.title,
-            'requestor_name': requestor.username,
-            'assignee_name': assignee.username,
-            'organization': ticket.organization.name,
-            'approval_time': timezone.now().strftime("%d.%m.%Y %H:%M:%S")
+            "ticket_title": ticket.title,
+            "requestor_name": requestor.username,
+            "assignee_name": assignee.username,
+            "organization": ticket.organization.name,
+            "approval_time": timezone.now().strftime("%d.%m.%Y %H:%M:%S"),
         }
 
         subject = f"Ticket {ticket.title} resolution confirmed by user"
-        html_content = render_to_string('core/resolution_approved.html', context)
+        html_content = render_to_string("core/resolution_approved.html", context)
         text_content = strip_tags(html_content)
 
         email = EmailMultiAlternatives(
@@ -231,5 +231,7 @@ def send_resolution_approved_notification(self, ticket_id):
         return
 
     except Exception as e:
-        logger.error(f"Failed to send resolution notification for {ticket_id}: {str(e)}")
-        self.retry(exc=e, countdown=2 ** self.request.retries)
+        logger.error(
+            f"Failed to send resolution notification for {ticket_id}: {str(e)}"
+        )
+        self.retry(exc=e, countdown=2**self.request.retries)

@@ -1,7 +1,7 @@
 import logging
 
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import Exists, ObjectDoesNotExist, OuterRef, Prefetch, Q, F
+from django.db.models import Exists, F, ObjectDoesNotExist, OuterRef, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
@@ -25,8 +25,8 @@ from core.tasks import (
     send_change_assignee_notification,
     send_change_status_notification,
     send_remove_assignee_notification,
-    send_set_assignee_notification,
     send_resolution_approved_notification,
+    send_set_assignee_notification,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,7 +76,9 @@ class TicketsViewSet(viewsets.ViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request):
-        serializer = CreateTicketSerializer(data=request.data, context={"request": request})
+        serializer = CreateTicketSerializer(
+            data=request.data, context={"request": request}
+        )
 
         try:
             serializer.is_valid(raise_exception=True)
@@ -220,24 +222,28 @@ class TicketsViewSet(viewsets.ViewSet):
 
                 new_status = ticket.status
 
-                if new_status == Ticket.Status.RESOLVED and old_status != Ticket.Status.RESOLVED:
+                if (
+                    new_status == Ticket.Status.RESOLVED
+                    and old_status != Ticket.Status.RESOLVED
+                ):
                     if ticket.assignee:
                         Membership.objects.filter(
-                            user=ticket.assignee,
-                            organization=ticket.organization
+                            user=ticket.assignee, organization=ticket.organization
                         ).update(
-                            resolved_tickets_count=F('resolved_tickets_count') + 1,
-                            active_tickets_count=F('active_tickets_count') - 1
+                            resolved_tickets_count=F("resolved_tickets_count") + 1,
+                            active_tickets_count=F("active_tickets_count") - 1,
                         )
 
-                elif old_status == Ticket.Status.RESOLVED and new_status != Ticket.Status.RESOLVED:
+                elif (
+                    old_status == Ticket.Status.RESOLVED
+                    and new_status != Ticket.Status.RESOLVED
+                ):
                     if ticket.assignee:
                         Membership.objects.filter(
-                            user=ticket.assignee,
-                            organization=ticket.organization
+                            user=ticket.assignee, organization=ticket.organization
                         ).update(
-                            resolved_tickets_count=F('resolved_tickets_count') - 1,
-                            active_tickets_count=F('active_tickets_count') + 1
+                            resolved_tickets_count=F("resolved_tickets_count") - 1,
+                            active_tickets_count=F("active_tickets_count") + 1,
                         )
 
                 if "status" in validated_data:
@@ -249,11 +255,8 @@ class TicketsViewSet(viewsets.ViewSet):
 
                 if "resolution_approved" in validated_data:
                     transaction.on_commit(
-                        lambda: send_resolution_approved_notification.delay(
-                            ticket.id
-                        )
+                        lambda: send_resolution_approved_notification.delay(ticket.id)
                     )
-
 
         except ValidationError as e:
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
@@ -352,31 +355,24 @@ class TicketsViewSet(viewsets.ViewSet):
             except ValidationError as e:
                 return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
 
-
             with transaction.atomic():
                 old_assignee = ticket.assignee
                 if old_assignee:
                     ticket.assignee = validated_data["new_assignee"]
 
-
                     Membership.objects.filter(
                         user=old_assignee,
                         organization=ticket.organization,
-                        active_tickets_count__lt=3
-                    ).update(
-                        active_tickets_count=F('active_tickets_count') - 1
-                    )
+                        active_tickets_count__lt=3,
+                    ).update(active_tickets_count=F("active_tickets_count") - 1)
 
                 ticket.save()
 
                 Membership.objects.filter(
                     user=ticket.assignee,
                     organization=ticket.organization,
-                    active_tickets_count__lt=3
-                ).update(
-                    active_tickets_count=F('active_tickets_count') + 1
-                )
-
+                    active_tickets_count__lt=3,
+                ).update(active_tickets_count=F("active_tickets_count") + 1)
 
                 transaction.on_commit(
                     lambda: send_change_assignee_notification.delay(
@@ -443,11 +439,8 @@ class TicketsViewSet(viewsets.ViewSet):
 
             with transaction.atomic():
                 Membership.objects.filter(
-                    user=old_assignee,
-                    organization=ticket.organization
-                ).update(
-                    active_tickets_count=F('active_tickets_count') - 1
-                )
+                    user=old_assignee, organization=ticket.organization
+                ).update(active_tickets_count=F("active_tickets_count") - 1)
 
                 ticket.assignee = None
                 ticket.save()
@@ -499,10 +492,8 @@ class TicketsViewSet(viewsets.ViewSet):
                 Membership.objects.filter(
                     user=ticket.assignee,
                     organization=ticket.organization,
-                    active_tickets_count__lt=3
-                ).update(
-                    active_tickets_count=F('active_tickets_count') + 1
-                )
+                    active_tickets_count__lt=3,
+                ).update(active_tickets_count=F("active_tickets_count") + 1)
 
                 ticket.save()
 
@@ -554,9 +545,9 @@ class TicketsViewSet(viewsets.ViewSet):
             ).select_related("requestor", "assignee", "organization")
 
         else:
-            return Ticket.objects.filter(
-                requestor=user
-            ).select_related("requestor", "assignee", "organization")
+            return Ticket.objects.filter(requestor=user).select_related(
+                "requestor", "assignee", "organization"
+            )
 
         return Ticket.objects.none()
 

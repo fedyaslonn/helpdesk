@@ -1,14 +1,12 @@
+from datetime import datetime, timedelta
+
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinLengthValidator
 from django.db import models, transaction
-from django.db.models import F, Q, Value, Min
+from django.db.models import F, Min, Q, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-
-
-from datetime import timedelta
-from datetime import datetime
 
 # Create your models here.
 
@@ -77,15 +75,14 @@ class TicketManager(models.Manager):
             if not candidates.exists():
                 return self.assign_to_admin(ticket)
 
-            min_active = candidates.aggregate(
-                min_active=Min('active_tickets')
-            )['min_active']
+            min_active = candidates.aggregate(min_active=Min("active_tickets"))[
+                "min_active"
+            ]
 
             best_candidates = candidates.filter(active_tickets=min_active)
 
             best_candidate = best_candidates.order_by(
-                models.F('last_ticket_resolved_at').asc(nulls_last=True),
-                'id'
+                models.F("last_ticket_resolved_at").asc(nulls_last=True), "id"
             ).first()
 
             if best_candidate:
@@ -114,8 +111,13 @@ class TicketManager(models.Manager):
         return self.get_queryset().filter(
             (Q(assignee=user) | Q(requestor=user)),
             organization=organization,
-            status__in=[Ticket.Status.OPEN, Ticket.Status.IN_PROGRESS, Ticket.Status.WAITING_FOR_REQUESTOR]
-            )
+            status__in=[
+                Ticket.Status.OPEN,
+                Ticket.Status.IN_PROGRESS,
+                Ticket.Status.WAITING_FOR_REQUESTOR,
+            ],
+        )
+
 
 class TimestampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -224,8 +226,7 @@ class Ticket(TimestampedModel):
     )
 
     resolution_approved = models.BooleanField(
-        default=False,
-        verbose_name=_("Resolution approved by requestor")
+        default=False, verbose_name=_("Resolution approved by requestor")
     )
 
     objects = TicketManager()
@@ -265,7 +266,6 @@ class Membership(TimestampedModel):
         db_table = "Membership"
 
 
-
 class Comment(TimestampedModel):
     ticket = models.ForeignKey(
         Ticket, on_delete=models.CASCADE, related_name="comments"
@@ -288,24 +288,18 @@ class Comment(TimestampedModel):
 
 class Application(TimestampedModel):
     class Status(models.TextChoices):
-        PENDING = 'pending', _('Pending')
-        APPROVED = 'approved', _('Approved')
-        REJECTED = 'rejected', _('Rejected')
+        PENDING = "pending", _("Pending")
+        APPROVED = "approved", _("Approved")
+        REJECTED = "rejected", _("Rejected")
 
     user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='applications'
+        User, on_delete=models.CASCADE, related_name="applications"
     )
     organization = models.ForeignKey(
-        Organization,
-        on_delete=models.CASCADE,
-        related_name='applications'
+        Organization, on_delete=models.CASCADE, related_name="applications"
     )
     status = models.CharField(
-        max_length=10,
-        choices=Status.choices,
-        default=Status.PENDING
+        max_length=10, choices=Status.choices, default=Status.PENDING
     )
     applied_at = models.DateTimeField(auto_now_add=True)
 
@@ -316,8 +310,8 @@ class Application(TimestampedModel):
 
         constraints = [
             models.UniqueConstraint(
-                fields=['user', 'organization'],
-                condition=Q(status='pending'),
-                name='unique_pending_application'
+                fields=["user", "organization"],
+                condition=Q(status="pending"),
+                name="unique_pending_application",
             )
         ]
