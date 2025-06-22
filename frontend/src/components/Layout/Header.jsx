@@ -9,9 +9,6 @@ const Header = () => {
       </div>
       <div className="header-right">
         <nav className="main-nav">
-          <Link to="/helpdesk/tickets">Tickets</Link>
-          <Link to="/users">Users</Link>
-          <Link to="/helpdesk/organizations">Organizations</Link>
           <LogOutButton />
         </nav>
       </div>

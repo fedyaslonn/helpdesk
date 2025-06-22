@@ -1,10 +1,10 @@
 from django.urls import path
 
+from core.views.applications import ApplicationsViewSet
 from core.views.comments import CommentsViewSet
 from core.views.organizations import OrganizationsViewSet
 from core.views.tickets import TicketsViewSet
 from core.views.users import UsersViewSet
-from core.views.applications import ApplicationsViewSet
 
 user_list = UsersViewSet.as_view({"get": "list", "post": "create"})
 
@@ -119,16 +119,16 @@ urlpatterns = [
     path(
         "applications/organization_applications/",
         applications_list,
-        name="organization-applications"
+        name="organization-applications",
     ),
     path(
         "applications/<int:pk>/accept_application/",
         accept_application,
-        name="accept-application"
+        name="accept-application",
     ),
     path(
         "applications/<int:pk>/reject_application/",
         reject_application,
-        name="reject-application"
+        name="reject-application",
     ),
 ]

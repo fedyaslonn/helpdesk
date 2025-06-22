@@ -34,6 +34,13 @@ const TicketsPage = () => {
 
       try {
         setIsLoading(true)
+       const params = {
+         status: statusFilter,
+       };
+
+      if (assigneeFilter) {
+        params.assignee = assigneeFilter;
+      }
 
         const token = localStorage.getItem('token')
         console.log("Current token:", token)
@@ -41,10 +48,7 @@ const TicketsPage = () => {
 
         const [userResponse, ticketsResponse] = await Promise.all([
           getCurrentUser(),
-          getTickets({
-            status: statusFilter,
-            assignee: assigneeFilter
-          })
+          getTickets(params)
         ]);
 
         setUserData(userResponse.data)
@@ -256,6 +260,22 @@ const TicketsPage = () => {
         <div className="filter-group">
           <label className="filter-group-label">Assignee</label>
           <div className="filter-buttons-container">
+                  <button
+      key="unassigned"
+      className={`filter-btn assignee ${assigneeFilter === 'unassigned' ? 'selected' : ''}`}
+      onClick={() => {
+        const newAssignee = assigneeFilter === 'unassigned' ? null : 'unassigned';
+        setAssigneeFilter(newAssignee)
+        setSearchParams((prev) => {
+          const newParams = new URLSearchParams(prev)
+          if (newAssignee) newParams.set('assignee', 'unassigned')
+          else newParams.delete('assignee')
+          return newParams
+        })
+      }}
+    >
+      Unassigned
+    </button>
             {Array.from(new Set(tickets.map((t) => t.assignee?.username).filter(Boolean)))
               .slice(0, 5)
               .map((username) => (
