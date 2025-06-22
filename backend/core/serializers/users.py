@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from core.models import User, Membership, User, Organization
+from core.models import Membership, Organization, User
 
 
 class GetUserSerializer(serializers.ModelSerializer):
@@ -115,9 +115,9 @@ class AdminAssignmentSerializer(serializers.Serializer):
     organization_id = serializers.IntegerField(required=True)
 
     def validate(self, attrs):
-        user_id = attrs['user_id']
-        organization_id = attrs['organization_id']
-        request_user = self.context['request'].user
+        user_id = attrs["user_id"]
+        organization_id = attrs["organization_id"]
+        request_user = self.context["request"].user
 
         try:
             organization = Organization.objects.get(id=organization_id)
@@ -126,18 +126,20 @@ class AdminAssignmentSerializer(serializers.Serializer):
             raise serializers.ValidationError("Organization does not exist")
 
         if not Membership.objects.filter(
-                user=request_user,
-                organization=organization,
-                role=Membership.Role.ADMIN,
-                is_active=True
+            user=request_user,
+            organization=organization,
+            role=Membership.Role.ADMIN,
+            is_active=True,
         ).exists():
-            raise serializers.ValidationError("Only organization admins can assign roles")
+            raise serializers.ValidationError(
+                "Only organization admins can assign roles"
+            )
 
         if not Membership.objects.filter(
-                user=user_id,
-                organization=organization,
-                is_active=True
+            user=user_id, organization=organization, is_active=True
         ).exists():
-            raise serializers.ValidationError("User is not a member of this organization")
+            raise serializers.ValidationError(
+                "User is not a member of this organization"
+            )
 
         return attrs

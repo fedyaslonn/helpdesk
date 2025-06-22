@@ -1,30 +1,30 @@
+from datetime import timedelta
 import logging
 
-from django.utils import timezone
 from django.contrib.auth.hashers import check_password
-from django.db import DatabaseError, IntegrityError
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import ObjectDoesNotExist, Prefetch, Q
-from django.db import transaction
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.exceptions import PermissionDenied, ValidationError
-from datetime import timedelta
 
-from core.tasks import send_apply_for_organization_notification
-from core.models import Comment, Organization, Ticket, User, Membership, Application
+from core.models import Application, Comment, Membership, Organization, Ticket, User
+from core.serializers.applications import (
+    CreateApplicationSerializer,
+    GetApplicationSerializer,
+)
 from core.serializers.users import (
+    AdminAssignmentSerializer,
     CreateUserSerializer,
     GetUserSerializer,
     PartialUpdateUserSerializer,
-    UpdateUserSerializer,
     ShiftSerializer,
-    AdminAssignmentSerializer,
+    UpdateUserSerializer,
 )
-from core.serializers.applications import CreateApplicationSerializer, GetApplicationSerializer
-
+from core.tasks import send_apply_for_organization_notification
 
 logger = logging.getLogger(__name__)
 
@@ -322,7 +322,9 @@ class UsersViewSet(viewsets.ViewSet):
         try:
             if Membership.objects.filter(user=user, is_active=True).exists():
                 return Response(
-                    {"error": "User already has an active membership in another organization"},
+                    {
+                        "error": "User already has an active membership in another organization"
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         except Exception as e:
@@ -337,9 +339,7 @@ class UsersViewSet(viewsets.ViewSet):
                 user.save()
 
                 membership = Membership.objects.create(
-                    user=user,
-                    organization=user.organization,
-                    is_active=True
+                    user=user, organization=user.organization, is_active=True
                 )
 
                 membership.save()
@@ -368,12 +368,12 @@ class UsersViewSet(viewsets.ViewSet):
         try:
             user = User.objects.get(Q(pk=pk) & Q(organization__isnull=False))
 
-            is_self_removal = (user == request.user)
+            is_self_removal = user == request.user
             is_admin_removal = Membership.objects.filter(
                 user=request.user,
                 organization=user.organization,
                 role=Membership.Role.ADMIN,
-                is_active=True
+                is_active=True,
             ).exists()
 
             if not (is_self_removal or is_admin_removal):
@@ -384,7 +384,7 @@ class UsersViewSet(viewsets.ViewSet):
             if Ticket.objects.active_tickets_for_user(user, user.organization).exists():
                 return Response(
                     {"error": "Cannot leave organization with active tickets"},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
         except User.DoesNotExist:
@@ -401,9 +401,7 @@ class UsersViewSet(viewsets.ViewSet):
         try:
             with transaction.atomic():
                 membership = Membership.objects.get(
-                    user=user,
-                    organization=user.organization,
-                    is_active=True
+                    user=user, organization=user.organization, is_active=True
                 )
 
                 membership.is_active = False
@@ -432,51 +430,48 @@ class UsersViewSet(viewsets.ViewSet):
         response = GetUserSerializer(user)
         return Response(data=response.data, status=status.HTTP_200_OK)
 
-
     @action(detail=True, methods=["post"])
     def apply_for_organization(self, request, pk=None):
         try:
             user = User.objects.get(pk=pk)
 
-
         except User.DoesNotExist:
             return Response(
-                {"error": "User not found"},
-                status=status.HTTP_404_NOT_FOUND
+                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
         serializer = CreateApplicationSerializer(
-            data=request.data,
-            context={'user': user, 'request': request}
+            data=request.data, context={"user": user, "request": request}
         )
 
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         validated_data = serializer.validated_data
-        organization = validated_data.get('organization')
+        organization = validated_data.get("organization")
 
         try:
             with transaction.atomic():
                 application = Application.objects.create(
                     user=user,
                     organization=organization,
-                    status=Application.Status.PENDING
+                    status=Application.Status.PENDING,
                 )
 
-                admin = User.objects.filter(
-                    organization=organization,
-                    memberships__role=Membership.Role.ADMIN,
-                    memberships__is_active=True
-                ).select_related('organization').first()
+                admin = (
+                    User.objects.filter(
+                        organization=organization,
+                        memberships__role=Membership.Role.ADMIN,
+                        memberships__is_active=True,
+                    )
+                    .select_related("organization")
+                    .first()
+                )
 
                 transaction.on_commit(
-                    lambda a=admin, u=user, o=organization:
-                        send_apply_for_organization_notification.delay(
-                            a.email,
-                            u.username,
-                            o.name
-                        )
+                    lambda a=admin, u=user, o=organization: send_apply_for_organization_notification.delay(
+                        a.email, u.username, o.name
+                    )
                 )
 
             response_serializer = GetApplicationSerializer(application)
@@ -484,22 +479,18 @@ class UsersViewSet(viewsets.ViewSet):
             return Response(
                 {
                     "status": "Application submitted successfully",
-                    "organization": response_serializer.data },
-                status=status.HTTP_201_CREATED
+                    "organization": response_serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
             )
 
         except Membership.DoesNotExist:
             return Response(
-                {"error": "Admin not found"},
-                status=status.HTTP_404_NOT_FOUND
+                {"error": "Admin not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
         except PermissionDenied as e:
-            return Response(
-                {"error": f"{str(e)}"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
+            return Response({"error": f"{str(e)}"}, status=status.HTTP_403_FORBIDDEN)
 
         except IntegrityError as e:
             return Response(
@@ -516,9 +507,8 @@ class UsersViewSet(viewsets.ViewSet):
             logger.error(f"Error creating application: {str(e)}", exc_info=True)
             return Response(
                 {"error": "Failed to process application"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
 
     @action(detail=True, methods=["get"])
     def get_current_user(self, request):
@@ -532,25 +522,21 @@ class UsersViewSet(viewsets.ViewSet):
         serializer = GetUserSerializer(user)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def update_shift(self, request, pk=None):
         try:
             worker = User.objects.get(pk=pk)
         except User.DoesNotExist:
             return Response(
-                {'error': 'User not found'},
-                status=status.HTTP_404_NOT_FOUND
+                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
         try:
-            worker_membership = Membership.objects.get(
-                user=worker,
-                is_active=True
-            )
+            worker_membership = Membership.objects.get(user=worker, is_active=True)
         except Membership.DoesNotExist:
             return Response(
-                {'error': 'User is not an active worker'},
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "User is not an active worker"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
@@ -558,20 +544,20 @@ class UsersViewSet(viewsets.ViewSet):
                 user=request.user,
                 organization=worker_membership.organization,
                 role=Membership.Role.ADMIN,
-                is_active=True
+                is_active=True,
             )
         except Membership.DoesNotExist:
             return Response(
-                {'error': 'You must be an admin of the organization to update shifts'},
-                status=status.HTTP_403_FORBIDDEN
+                {"error": "You must be an admin of the organization to update shifts"},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         serializer = ShiftSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        shift_start = serializer.validated_data.get('shift_start')
-        shift_end = serializer.validated_data.get('shift_end')
+        shift_start = serializer.validated_data.get("shift_start")
+        shift_end = serializer.validated_data.get("shift_end")
 
         try:
             with transaction.atomic():
@@ -589,24 +575,25 @@ class UsersViewSet(viewsets.ViewSet):
                 )
 
                 return Response(
-                    {'status': 'Shift updated successfully'},
-                    status=status.HTTP_200_OK
+                    {"status": "Shift updated successfully"}, status=status.HTTP_200_OK
                 )
 
         except DatabaseError as e:
             return Response(
-                {'error': f'Database error: {str(e)}'},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
+                {"error": f"Database error: {str(e)}"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         except Exception as e:
             return Response(
-                {'error': f'Failed to update shift: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Failed to update shift: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def assign_to_admin(self, request, pk=None):
-        serializer = AdminAssignmentSerializer(data=request.data, context={'request': request})
+        serializer = AdminAssignmentSerializer(
+            data=request.data, context={"request": request}
+        )
 
         try:
             serializer.is_valid()
@@ -615,13 +602,13 @@ class UsersViewSet(viewsets.ViewSet):
             with transaction.atomic():
                 membership = Membership.objects.get(
                     user=vaidated_data.get("user_id"),
-                    organization=vaidated_data.get("organization_id")
+                    organization=vaidated_data.get("organization_id"),
                 )
 
                 if membership.role == Membership.Role.ADMIN:
                     return Response(
                         {"status": "User is already an admin"},
-                        status=status.HTTP_200_OK
+                        status=status.HTTP_200_OK,
                     )
 
                 membership.role = Membership.Role.ADMIN
@@ -630,7 +617,7 @@ class UsersViewSet(viewsets.ViewSet):
 
             return Response(
                 {"status": "User successfully promoted to admin"},
-                status=status.HTTP_200_OK
+                status=status.HTTP_200_OK,
             )
 
         except ValidationError as e:
@@ -651,5 +638,5 @@ class UsersViewSet(viewsets.ViewSet):
             logger.error(f"Error in assignment to admin role: {str(e)}", exc_info=True)
             return Response(
                 {"error": "Failed to process assignment"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

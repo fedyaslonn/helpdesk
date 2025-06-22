@@ -12,7 +12,15 @@ class GetMembershipSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Membership
-        fields = ["user", "role", "role_display", "organization", "shift_start", "shift_end", "is_active"]
+        fields = [
+            "user",
+            "role",
+            "role_display",
+            "organization",
+            "shift_start",
+            "shift_end",
+            "is_active",
+        ]
 
     def get_organization(self, obj):
         return {"id": obj.organization.id, "name": obj.organization.name}
