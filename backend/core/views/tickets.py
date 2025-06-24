@@ -21,6 +21,7 @@ from core.serializers.tickets import (
     SetAssigneeSerializer,
     UpdateTicketSerializer,
 )
+from core.services.utils import TicketNotificationService
 from core.tasks import (
     send_change_assignee_notification,
     send_change_status_notification,
@@ -338,7 +339,7 @@ class TicketsViewSet(viewsets.ViewSet):
                 new_assignee_id = ticket.assignee.id if ticket.assignee else None
 
                 transaction.on_commit(
-                    lambda: self.send_notification(
+                    lambda: TicketNotificationService.send_notification(
                         operation, ticket.id, old_assignee_id, new_assignee_id
                     )
                 )
@@ -375,18 +376,6 @@ class TicketsViewSet(viewsets.ViewSet):
 
         response = GetTicketSerializer(ticket)
         return Response(data=response.data, status=status.HTTP_200_OK)
-
-    def send_notification(self, operation, ticket_id, old_assignee_id, new_assignee_id):
-        if operation == "change":
-            send_change_assignee_notification.delay(
-                ticket_id, old_assignee_id, new_assignee_id
-            )
-
-        elif operation == "set":
-            send_set_assignee_notification.delay(ticket_id, new_assignee_id)
-
-        elif operation == "remove":
-            send_remove_assignee_notification.delay(ticket_id, old_assignee_id)
 
     def get_queryset(self):
         user = self.request.user
