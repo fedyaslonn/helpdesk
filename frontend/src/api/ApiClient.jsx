@@ -5,7 +5,7 @@ import { serverApi } from '../contants'
 console.log('serverApi:', serverApi);
 
 const apiClientInstance = axios.create({
-  baseURL: `${serverApi}/authentication/`,
+  baseURL: `${serverApi}`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -14,7 +14,7 @@ const apiClientInstance = axios.create({
 apiClientInstance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token')
-    if (token && !config.url.includes('/token/refresh/')) {
+    if (token && !config.url.includes('/authentication/token/refresh/')) {
       config.headers.Authorization = `Bearer ${token}`
     }
     return config;
@@ -29,8 +29,8 @@ apiClientInstance.interceptors.response.use(
 
     if (error.response?.status === 401 &&
         !originalRequest._retry &&
-        !originalRequest.url.includes('/token/') &&
-        !originalRequest.url.includes('/login/')) {
+        !originalRequest.url.includes('/authentication/token/') &&
+        !originalRequest.url.includes('/authentication/login/')) {
 
       originalRequest._retry = true
 
@@ -39,7 +39,7 @@ apiClientInstance.interceptors.response.use(
         if (!refreshToken) throw new Error('No refresh token available')
 
         const response = await axios.post(
-          `${serverApi}/api/token/refresh/`,
+          `${serverApi}/authentication/api/token/refresh/`,
           { refresh: refreshToken }
         );
 
@@ -79,7 +79,7 @@ apiClientInstance.interceptors.response.use(
 
 const apiClient = {
   login: async (username, password) => {
-    const response = await apiClientInstance.post('/api/token/', { username, password });
+    const response = await apiClientInstance.post('/authentication/api/token/', { username, password });
     const { access, refresh, user_id, email } = response.data
 
 
@@ -102,7 +102,7 @@ const apiClient = {
         return { user: null };
       }
 
-      const response = await apiClientInstance.get('/api/token/check_auth/');
+      const response = await apiClientInstance.get('/authentication/api/token/check_auth/');
       return response.data;
     } catch (error) {
       console.error('Authentication check failed:', error)
@@ -114,7 +114,7 @@ const apiClient = {
     try {
       const refreshToken = localStorage.getItem('refresh_token')
       if (refreshToken) {
-        await apiClientInstance.post('/logout/', { refresh_token: refreshToken })
+        await apiClientInstance.post('/authentication/logout/', { refresh_token: refreshToken })
       }
     } finally {
 
@@ -126,4 +126,5 @@ const apiClient = {
   },
 }
 
+export { apiClientInstance }
 export default apiClient
