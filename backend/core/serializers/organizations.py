@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from core.models import Membership, Organization
+from core.models import Organization
 from core.serializers.users import GetUserSerializer
 
 
@@ -9,19 +9,6 @@ class CreateOrganizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organization
         fields = ["name", "email"]
-
-    def validate(self, attrs):
-        request = self.context.get("request")
-
-        if not request or not request.user.is_authenticated:
-            raise serializers.ValidationError("User is not authenticated.")
-
-        if Membership.objects.filter(user=request.user, is_active=True).exists():
-            raise serializers.ValidationError(
-                "User is already an admin or member of other organization"
-            )
-
-        return attrs
 
 
 class GetOrganizationSerializer(serializers.ModelSerializer):
@@ -40,12 +27,6 @@ class GetOrganizationSerializer(serializers.ModelSerializer):
 
 
 class UpdateOrganizationSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(
-        validators=[UniqueValidator(queryset=Organization.objects.all())],
-        required=False,
-        allow_null=True,
-    )
-
     class Meta:
         model = Organization
         fields = ["name", "email", "is_active"]
