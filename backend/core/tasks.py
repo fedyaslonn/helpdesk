@@ -1,4 +1,5 @@
 import logging
+import os
 
 from celery import shared_task
 from django.conf import settings
@@ -15,12 +16,16 @@ from core.services.email import (
 
 from .models import Ticket
 
+MAX_RETRIES = int(os.getenv("NOTIFICATION_TASK_MAX_RETRIES"))  # type: ignore
+RETRY_DELAY = int(os.getenv("NOTIFICATION_TASK_RETRY_DELAY"))  # type: ignore
+
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
 
-@shared_task(bind=True, max_retries=3)
+@shared_task(bind=True, max_retries=MAX_RETRIES, retry_backoff=RETRY_DELAY)
 def send_change_assignee_notification(
     self, ticket_id, old_assignee_id, new_assignee_id
 ):
@@ -46,7 +51,7 @@ def send_change_assignee_notification(
         self.retry(exc=e)
 
 
-@shared_task(bind=True, max_retries=3)
+@shared_task(bind=True, max_retries=MAX_RETRIES, retry_backoff=RETRY_DELAY)
 def send_remove_assignee_notification(self, ticket_id, old_assignee_id):
     try:
         ticket = Ticket.objects.get(pk=ticket_id)
@@ -65,7 +70,7 @@ def send_remove_assignee_notification(self, ticket_id, old_assignee_id):
         self.retry(exc=e)
 
 
-@shared_task(bind=True, max_retries=3)
+@shared_task(bind=True, max_retries=MAX_RETRIES, retry_backoff=RETRY_DELAY)
 def send_change_status_notification(self, ticket_id, old_status, new_status):
     try:
         ticket = Ticket.objects.get(pk=ticket_id)
@@ -84,7 +89,7 @@ def send_change_status_notification(self, ticket_id, old_status, new_status):
         self.retry(exc=e)
 
 
-@shared_task(bind=True, max_retries=3)
+@shared_task(bind=True, max_retries=MAX_RETRIES, retry_backoff=RETRY_DELAY)
 def send_set_assignee_notification(self, ticket_id, new_assignee_id):
     try:
         ticket = Ticket.objects.get(pk=ticket_id)
