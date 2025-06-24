@@ -35,6 +35,9 @@ ticket_detail = TicketsViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
 
+ticket_assign = TicketsViewSet.as_view({"post": "assign"})
+
+
 urlpatterns = [
     path("users/users_list/", user_list, name="user-list"),
     path("users/<int:pk>/", user_detail, name="user-detail"),
@@ -61,4 +64,9 @@ urlpatterns = [
     path("comments/<int:pk>/", comment_detail, name="comment-detail"),
     path("tickets/tickets_list/", ticket_list, name="ticket-list"),
     path("tickets/<int:pk>/", ticket_detail, name="ticket-detail"),
+    path(
+        "tickets/<int:pk>/assign/",
+        ticket_assign,
+        name="ticket-assign",
+    ),
 ]

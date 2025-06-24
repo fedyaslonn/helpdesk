@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
+    "django_filters",
 ]
 
 MIDDLEWARE = [
@@ -133,6 +134,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
 }
 
 CSRF_TRUSTED_ORIGINS = [
@@ -141,8 +143,8 @@ CSRF_TRUSTED_ORIGINS = [
 
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(seconds=int(os.getenv('ACCESS_TOKEN_LIFETIME'))),     # type: ignore
-    "REFRESH_TOKEN_LIFETIME": timedelta(seconds=int(os.getenv('REFRESH_TOKEN_LIFETIME'))),   # type: ignore
+    "ACCESS_TOKEN_LIFETIME": timedelta(seconds=int(os.getenv("ACCESS_TOKEN_LIFETIME_IN_SECONDS"))),  # type: ignore
+    "REFRESH_TOKEN_LIFETIME": timedelta(seconds=int(os.getenv("REFRESH_TOKEN_LIFETIME_IN_SECONDS"))),  # type: ignore
     "ROTATE_REFRESH_TOKENS": False,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
@@ -168,3 +170,29 @@ SIMPLE_JWT = {
     "TOKEN_VERIFY_SERIALIZER": "rest_framework_simplejwt.serializers.TokenVerifySerializer",
     "TOKEN_BLACKLIST_SERIALIZER": "authentication.serializers.CustomTokenBlacklistSerializer",
 }
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = os.getenv("EMAIL_PORT")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAUL_FROM_EMAIL")
+
+CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER")
+CELERY_TASK_ACKS_LATE = os.getenv("CELERY_TASK_ACKS_LATE")
+CELERY_WORKER_PROC_NAME = os.getenv("CELERY_WORKER_PROC_NAME")
+CELERY_WORKER_PREFETCH_MULTIPLIER = os.getenv("CELERY_WORKER_PREFETCH_MULTIPLIER")
+CELERY_WORKER_MAX_TASKS_PER_CHILD = os.getenv("CELERY_WORKER_MAX_TASKS_PER_CHILD")
+CELERY_TASK_CREATE_MISSING_QUEUES = os.getenv("CELERY_TASK_CREATE_MISSING_QUEUES")
+CELERY_TASK_REJECT_ON_WORKER_LOST = os.getenv("CELERY_TASK_REJECT_ON_WORKER_LOST")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = os.getenv("CELERY_TIMEZONE")
+CELERY_ENABLE_UTC = os.getenv("CELERY_ENABLE_UTC")
+CELERY_TASK_PUBLISH_RETRY = os.getenv("CELERY_TASK_PUBLISH_RETRY")
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = os.getenv(
+    "CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP"
+)
+CELERY_TASK_PUBLISH_RETRY_POLICY = os.getenv("CELERY_TASK_PUBLISH_RETRY_POLICY")
