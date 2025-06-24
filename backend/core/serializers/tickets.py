@@ -168,6 +168,11 @@ class PartialUpdateTicketSerializer(serializers.ModelSerializer):
                 )
 
         if "status" in attrs:
+            if self.instance.status == Ticket.Status.RESOLVED:
+                raise serializers.ValidationError(
+                    {"status": "Cannot modify status of a resolved ticket"}
+                )
+
             is_org_admin = Membership.objects.filter(
                 user=user,
                 organization=ticket.organization,
@@ -309,6 +314,11 @@ class ChangeAssigneeSerializer(serializers.ModelSerializer):
         return val
 
     def validate(self, attrs):
+        if self.instance.status == Ticket.Status.RESOLVED:
+            raise serializers.ValidationError(
+                {"non_field_errors": "Cannot modify assignee of a resolved ticket"}
+            )
+
         if attrs["old_assignee"] == attrs["new_assignee"]:
             raise serializers.ValidationError(
                 {"new_assignee": "New assignee must be different from old assignee"}
@@ -320,6 +330,11 @@ class ChangeAssigneeSerializer(serializers.ModelSerializer):
 class RemoveAssigneeSerializer(serializers.Serializer):
     def validate(self, attrs):
         ticket = self.context.get("ticket")
+
+        if ticket.status == Ticket.Status.RESOLVED:
+            raise serializers.ValidationError(
+                {"non_field_errors": "Cannot modify assignee of a resolved ticket"}
+            )
 
         if ticket.assignee is None:
             raise serializers.ValidationError({"assignee": "Ticket has no assignee"})
@@ -363,6 +378,12 @@ class SetAssigneeSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         ticket = self.instance
+
+        if ticket.status == Ticket.Status.RESOLVED:
+            if ticket.status == Ticket.Status.RESOLVED:
+                raise serializers.ValidationError(
+                    {"non_field_errors": "Cannot modify assignee of a resolved ticket"}
+                )
 
         if ticket.assignee:
             raise serializers.ValidationError("Ticket has already been assigned")
