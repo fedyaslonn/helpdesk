@@ -78,10 +78,10 @@ urlpatterns = [
         ticket_check_admin,
         name="ticket-check-admin",
     ),
+    path("users/me/", get_current_user, name="current-user"),
     path(
-        "users/me/", get_current_user, name='current-user'
-    ),
-    path(
-        "organizations/<int:pk>/members/", organization_get_members, name='organizations-members',
+        "organizations/<int:pk>/members/",
+        organization_get_members,
+        name="organizations-members",
     ),
 ]

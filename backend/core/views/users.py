@@ -331,12 +331,12 @@ class UsersViewSet(viewsets.ViewSet):
         response = GetUserSerializer(user)
         return Response(data=response.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=["get"])
     def get_current_user(self, request):
         if not request.user.is_authenticated:
             return Response(
                 {"error": "Authentication required"},
-                status=status.HTTP_401_UNAUTHORIZED
+                status=status.HTTP_401_UNAUTHORIZED,
             )
 
         user = request.user

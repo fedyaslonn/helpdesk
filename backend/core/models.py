@@ -1,10 +1,82 @@
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinLengthValidator
-from django.db import models
-from django.db.models import Q
+from django.db import models, transaction
+from django.db.models import F, Q, Value
+from django.db.models.functions import Coalesce
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 # Create your models here.
+
+
+class TicketManager(models.Manager):
+    def get_current_shift_users(self, organization):
+        now = timezone.now().time()
+
+        return (
+            Membership.objects.filter(
+                organization=organization,
+                is_active=True,
+                user__is_active=True,
+                shift_start__isnull=False,
+                shift_end__isnull=False,
+            )
+            .filter(
+                models.Q(shift_start__lte=now, shift_end__gt=now)
+                | models.Q(shift_start__gt=models.F("shift_end"), shift_start__lte=now)
+                | models.Q(shift_end__lt=models.F("shift_start"), shift_end__gt=now)
+            )
+            .select_related("user")
+        )
+
+    def auto_assign(self, ticket):
+        with transaction.atomic():
+            available_users = self.get_current_shift_users(ticket.organization)
+
+            available_users = available_users.annotate(
+                active_tickets=models.Count(
+                    "user__assigned_tickets",
+                    filter=models.Q(
+                        user__assigned_tickets__status__in=[
+                            Ticket.Status.OPEN,
+                            Ticket.Status.IN_PROGRESS,
+                            Ticket.Status.WAITING_FOR_REQUESTOR,
+                        ]
+                    ),
+                )
+            )
+
+            candidates = available_users.filter(active_tickets__lt=3)
+
+            if not candidates.exists():
+                return self.assign_to_admin(ticket)
+
+            best_candidate = (
+                candidates.select_related("user")
+                .order_by("resolved_tickets_count", "last_ticket_resolved_at")
+                .first()
+            )
+
+            if best_candidate:
+                ticket.assignee = best_candidate.user
+                ticket.save()
+                Membership.objects.filter(id=best_candidate.id).update(
+                    active_tickets_count=models.F("active_tickets_count") + 1
+                )
+
+            return ticket
+
+    def assign_to_admin(self, ticket):
+        admin = Membership.objects.filter(
+            organization=ticket.organization, role=Membership.Role.ADMIN, is_active=True
+        ).first()
+
+        if admin:
+            ticket.assignee = admin.user
+            admin.active_tickets_count = models.F("active_tickets_count") + 1
+            admin.save()
+
+        return ticket
 
 
 class TimestampedModel(models.Model):
@@ -112,6 +184,8 @@ class Ticket(TimestampedModel):
         default=Status.OPEN,
     )
 
+    objects = TicketManager()
+
     class Meta:
         verbose_name = _("Ticket")
         verbose_name_plural = _("Tickets")
@@ -126,12 +200,18 @@ class Membership(models.Model):
         ADMIN = "admin", _("Admin")
         WORKER = "worker", _("Worker")
 
+    active_tickets_count = models.PositiveIntegerField(default=0)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="memberships")
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="memberships"
     )
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.WORKER)
     is_active = models.BooleanField(default=True)
+    shift_start = models.TimeField(null=True, blank=True)
+    shift_end = models.TimeField(null=True, blank=True)
+
+    resolved_tickets_count = models.PositiveIntegerField(default=0)
+    last_ticket_resolved_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = _("Membership")

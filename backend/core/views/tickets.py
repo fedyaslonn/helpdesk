@@ -58,13 +58,13 @@ class TicketsViewSet(viewsets.ViewSet):
                 user=user,
                 organization=ticket.organization,
                 role=Membership.Role.ADMIN,
-                is_active=True
+                is_active=True,
             ).exists()
 
             if not (is_requestor or is_assignee or is_org_admin):
                 return Response(
                     {"error": "You don't have permission to view this ticket"},
-                    status=status.HTTP_403_FORBIDDEN
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
         except Ticket.DoesNotExist:
@@ -83,7 +83,7 @@ class TicketsViewSet(viewsets.ViewSet):
             validated_data = serializer.validated_data
 
             with transaction.atomic():
-                ticket = Ticket.objects.create(
+                ticket = Ticket(
                     requestor=request.user,
                     organization=validated_data.get("organization"),
                     title=validated_data.get("title"),
@@ -91,10 +91,21 @@ class TicketsViewSet(viewsets.ViewSet):
                     status=Ticket.Status.OPEN,
                 )
 
+                ticket = Ticket.objects.auto_assign(ticket)
                 ticket.save()
+
+                logger.error(f"ticket:{ticket.assignee}")
+
                 ticket = Ticket.objects.select_related(
                     "requestor", "assignee", "organization"
                 ).get(id=ticket.id)
+
+                if ticket.assignee:
+                    transaction.on_commit(
+                        lambda: send_set_assignee_notification.delay(
+                            ticket.id, ticket.assignee.id
+                        )
+                    )
 
         except ValidationError as e:
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
@@ -385,7 +396,10 @@ class TicketsViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['get'])
     def check_admin(self, request, pk=None):
         if not request.user.is_authenticated:
-            return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(
+                {"error": "Authentication required"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
         try:
             ticket = Ticket.objects.get(pk=pk)
@@ -394,13 +408,16 @@ class TicketsViewSet(viewsets.ViewSet):
                 user_id=request.user.id,
                 organization=ticket.organization.id,
                 role=Membership.Role.ADMIN,
-                is_active=True
+                is_active=True,
             ).exists()
 
             return Response({"is_admin": is_admin})
 
         except Ticket.DoesNotExist:
-            return Response({"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Ticket not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
     def get_queryset(self):
         user = self.request.user

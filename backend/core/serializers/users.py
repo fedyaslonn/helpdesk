@@ -29,7 +29,7 @@ class GetUserSerializer(serializers.ModelSerializer):
         if obj.organization:
             return {
                 "id": obj.organization.id,
-                "name": obj.organization.name
+                "name": obj.organization.name,
             }
 
         return None
