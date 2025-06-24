@@ -1,9 +1,3 @@
-from authentication.serializers import (
-    CustomTokenBlackListSerializer,
-    CustomTokenObtainPairSerializer,
-    CustomTokenRefreshSerializer,
-    LogoutSerializer,
-)
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -21,6 +15,13 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
     TokenVerifyView,
+)
+
+from authentication.serializers import (
+    CustomTokenBlackListSerializer,
+    CustomTokenObtainPairSerializer,
+    CustomTokenRefreshSerializer,
+    LogoutSerializer,
 )
 
 # Create your views here.

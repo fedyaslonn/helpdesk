@@ -1,12 +1,14 @@
 import logging
 
-from django.db import DatabaseError, IntegrityError
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import ObjectDoesNotExist, Prefetch
+from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
-from core.models import Comment, Organization, Ticket, User
+from core.models import Comment, Membership, Organization, Ticket, User
+from core.permissions import IsAdminOfOrganization
 from core.serializers.organizations import (
     CreateOrganizationSerializer,
     GetOrganizationSerializer,
@@ -36,25 +38,35 @@ class OrganizationsViewSet(viewsets.ViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request):
-        serializer = CreateOrganizationSerializer(data=request.data)
+        serializer = CreateOrganizationSerializer(
+            data=request.data, context={"request": request}
+        )
 
         try:
             serializer.is_valid(raise_exception=True)
             validated_data = serializer.validated_data
 
-        except ValidationError as e:
-            return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+            with transaction.atomic():
+                organization = Organization.objects.create(
+                    name=validated_data["name"],
+                    email=validated_data["email"],
+                )
 
-        try:
-            organization = Organization.objects.create(
-                name=validated_data["name"],
-                email=validated_data["email"],
-            )
+                Membership.objects.create(
+                    user=request.user,
+                    organization=organization,
+                    role=Membership.Role.ADMIN,
+                    is_active=True,
+                )
 
-            organization.save()
-            organization = Organization.objects.prefetch_related("members").get(
-                pk=organization.id
-            )
+                organization = Organization.objects.prefetch_related("members").get(
+                    pk=organization.id
+                )
+
+                organization.save()
+
+                request.user.organization = organization
+                request.user.save()
 
         except ValidationError as e:
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
@@ -82,27 +94,33 @@ class OrganizationsViewSet(viewsets.ViewSet):
 
     def update(self, request, pk=None):
         try:
-            organization = Organization.objects.prefetch_related("members").get(pk=pk)
+            organization = self.get_object(pk=pk)
 
-        except ObjectDoesNotExist:
-            return Response(
-                {"error": "Organization not found"}, status=status.HTTP_404_NOT_FOUND
+            if not IsAdminOfOrganization().has_object_permission(
+                request, self, organization
+            ):
+                raise PermissionDenied(
+                    "Only organization admin can perform this action"
+                )
+
+            serializer = UpdateOrganizationSerializer(
+                organization, data=request.data, context={"request": request}
             )
-
-        serializer = UpdateOrganizationSerializer(data=request.data, partial=False)
-
-        try:
             serializer.is_valid(raise_exception=True)
             validated_data = serializer.validated_data
 
-        except ValidationError as e:
-            return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+            with transaction.atomic():
+                organization.name = validated_data.get("name", organization.name)
+                organization.email = validated_data.get("email", organization.email)
+                organization.save()
 
-        try:
-            organization.name = validated_data.get("name", organization.name)
-            organization.email = validated_data.get("email", organization.email)
+            response = GetOrganizationSerializer(organization)
+            return Response(response.data, status=status.HTTP_200_OK)
 
-            organization.save()
+        except Organization.DoesNotExist:
+            return Response(
+                {"error": "Organization not found"}, status=status.HTTP_404_NOT_FOUND
+            )
 
         except ValidationError as e:
             return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
@@ -121,12 +139,9 @@ class OrganizationsViewSet(viewsets.ViewSet):
 
         except Exception as e:
             return Response(
-                {"error": f"Failed to update organization: {str(e)}"},
+                {"error": f"Failed to create organization: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-        response = GetOrganizationSerializer(organization)
-        return Response(response.data, status=status.HTTP_200_OK)
 
     def partial_update(self, request, pk=None):
         try:
@@ -137,9 +152,19 @@ class OrganizationsViewSet(viewsets.ViewSet):
                 {"error": "Organization not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
+        if not IsAdminOfOrganization().has_object_permission(
+            request, self, organization
+        ):
+            raise PermissionDenied("Only organization admin can perform this action")
+
         serializer = PartialUpdateOrganizationSerializer(
             data=request.data, partial=True
         )
+
+        if not IsAdminOfOrganization().has_object_permission(
+            request, self, organization
+        ):
+            raise PermissionDenied("Only organization admin can perform this action")
 
         try:
             serializer.is_valid(raise_exception=True)
@@ -176,10 +201,29 @@ class OrganizationsViewSet(viewsets.ViewSet):
 
     def destroy(self, request, pk=None):
         try:
-            organization = Organization.objects.get(pk=pk)
+            organization = self.get_object(pk)
+            if not organization:
+                return Response(
+                    {"error": "Organization not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
-            organization.delete()
-            logger.info(f"Organization {organization.id} deleted successfully!")
+            if not IsAdminOfOrganization().has_object_permission(
+                request, self, organization
+            ):
+                raise PermissionDenied(
+                    "Only organization admin can perform this action"
+                )
+
+            with transaction.atomic():
+                Membership.objects.filter(organization=organization).update(
+                    is_active=False
+                )
+
+                User.objects.filter(organization=organization).update(organization=None)
+
+                organization.is_active = False
+                organization.save()
 
             return Response(
                 {"status": "Organization deleted successfully!"},
@@ -202,3 +246,12 @@ class OrganizationsViewSet(viewsets.ViewSet):
                 {"error": f"Failed to delete user {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    def get_object(self, pk):
+        try:
+            return self.get_queryset().get(pk=pk)
+        except ObjectDoesNotExist:
+            return None
+
+    def get_queryset(self):
+        return Organization.objects.prefetch_related("members").all()
