@@ -37,12 +37,10 @@ ticket_detail = TicketsViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
 
-ticket_change_assignee = TicketsViewSet.as_view({"post": "change_assignee"})
-ticket_remove_assignee = TicketsViewSet.as_view({"post": "remove_assignee"})
-ticket_set_assignee = TicketsViewSet.as_view({"post": "set_assignee"})
-ticket_check_admin = TicketsViewSet.as_view({"get": "admin_check"})
 
 get_current_user = UsersViewSet.as_view({"get": "get_current_user"})
+ticket_assign = TicketsViewSet.as_view({"post": "assign"})
+
 
 urlpatterns = [
     path("users/users_list/", user_list, name="user-list"),
@@ -71,19 +69,9 @@ urlpatterns = [
     path("tickets/tickets_list/", ticket_list, name="ticket-list"),
     path("tickets/<int:pk>/", ticket_detail, name="ticket-detail"),
     path(
-        "tickets/<int:pk>/change_assignee/",
-        ticket_change_assignee,
-        name="ticket-change-assignee",
-    ),
-    path(
-        "tickets/<int:pk>/remove_assignee/",
-        ticket_remove_assignee,
-        name="ticket-remove-assignee",
-    ),
-    path(
-        "tickets/<int:pk>/set_assignee/",
-        ticket_set_assignee,
-        name="ticket-set-assignee",
+        "tickets/<int:pk>/assign/",
+        ticket_assign,
+        name="ticket-assign",
     ),
     path(
         "tickets/<int:pk>/check_admin/",
