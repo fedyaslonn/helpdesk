@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useAuth } from '../auth'
+import { useAuth } from "../auth/AuthContext"
 import { useNavigate } from 'react-router-dom'
 import { getOrganizations, getUsers, createTicket } from '../services/ticket-management-api'
 import '../styles/TicketsPage.css'
@@ -97,15 +97,15 @@ const TicketCreateForm = () => {
                 <div className="header-icon">
                   <i className="bi bi-ticket-perforated fs-3"></i>
                 </div>
-                <h1 className="header-title">Создать новый тикет</h1>
-                <p className="header-subtitle mb-0">Подайте заявку в службу поддержки</p>
+                <h1 className="header-title">Create new ticket</h1>
+                <p className="header-subtitle mb-0">Submit a support request</p>
               </div>
               <div className="ticket-form-body">
                 <form onSubmit={handleSubmit} noValidate>
                   <div className="form-group-enhanced">
                     <label htmlFor="title" className="form-label-enhanced">
                       <i className="bi bi-card-heading"></i>
-                      Заголовок тикета
+                      Ticket's title
                       <span className="required-asterisk">*</span>
                     </label>
                     <div className="position-relative">
@@ -116,7 +116,7 @@ const TicketCreateForm = () => {
                         name="title"
                         value={formData.title}
                         onChange={handleChange}
-                        placeholder="Кратко опишите проблему"
+                        placeholder="Describe your problem briefly"
                         maxLength={52}
                         required
                       />
@@ -128,7 +128,7 @@ const TicketCreateForm = () => {
                   <div className="form-group-enhanced">
                     <label htmlFor="organization" className="form-label-enhanced">
                       <i className="bi bi-building"></i>
-                      Организация
+                      Organization
                       <span className="required-asterisk">*</span>
                     </label>
                     <select
@@ -149,7 +149,7 @@ const TicketCreateForm = () => {
                   <div className="form-group-enhanced">
                     <label htmlFor="description" className="form-label-enhanced">
                       <i className="bi bi-card-text"></i>
-                      Описание проблемы
+                      Problem description
                       <span className="required-asterisk">*</span>
                     </label>
                     <textarea
@@ -158,7 +158,7 @@ const TicketCreateForm = () => {
                       name="description"
                       value={formData.description}
                       onChange={handleChange}
-                      placeholder="Подробно опишите вашу проблему..."
+                      placeholder="Please describe your problem in details..."
                       required
                     ></textarea>
                   </div>
@@ -172,12 +172,12 @@ const TicketCreateForm = () => {
                       {isSubmitting ? (
                         <>
                           <span className="loading-spinner me-2"></span>
-                          Создание тикета...
+                          Ticket creation...
                         </>
                       ) : (
                         <>
                           <i className="bi bi-check-circle me-2"></i>
-                          Создать тикет
+                          Create ticket
                         </>
                       )}
                     </button>

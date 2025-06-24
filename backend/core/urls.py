@@ -23,6 +23,8 @@ organization_detail = OrganizationsViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
 
+organization_get_members = OrganizationsViewSet.as_view({"get": "get_members"})
+
 comment_creation = CommentsViewSet.as_view({"post": "create"})
 
 comment_detail = CommentsViewSet.as_view(
@@ -35,6 +37,8 @@ ticket_detail = TicketsViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
 
+
+get_current_user = UsersViewSet.as_view({"get": "get_current_user"})
 ticket_assign = TicketsViewSet.as_view({"post": "assign"})
 
 
@@ -68,5 +72,16 @@ urlpatterns = [
         "tickets/<int:pk>/assign/",
         ticket_assign,
         name="ticket-assign",
+    ),
+    path(
+        "tickets/<int:pk>/check_admin/",
+        ticket_check_admin,
+        name="ticket-check-admin",
+    ),
+    path(
+        "users/me/", get_current_user, name='current-user'
+    ),
+    path(
+        "organizations/<int:pk>/members/", organization_get_members, name='organizations-members',
     ),
 ]

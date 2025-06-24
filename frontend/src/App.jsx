@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth, AuthContext, AuthProvider, LoginForm, LogOutButton } from './auth';
 
-import { UsersList, UserCreate, UserUpdate, TicketsPage, OrganizationsList, CreateOrganization, TicketCreateForm, ProtectedRoute, CreateComment } from './components'
+import { UsersList, UserCreate, UserUpdate, TicketsPage, OrganizationsList, CreateOrganization, TicketCreateForm, ProtectedRoute, CreateComment, TicketDetail, EditTicket } from './components'
 import Layout from './components/Layout/Layout.jsx';
 
 
@@ -23,7 +23,9 @@ function App() {
             <Route path="helpdesk">
               <Route path="tickets">
                 <Route index element={<TicketsPage />} />
-                <Route path="helpdesk/tickets/create" element={<TicketCreateForm />} />
+                <Route path="create" element={<TicketCreateForm />} />
+                <Route path=":id" element={<TicketDetail />} />
+                  <Route path="/helpdesk/tickets/:id/update" element={<EditTicket />} />
               </Route>
             </Route>
 

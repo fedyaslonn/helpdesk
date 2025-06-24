@@ -27,7 +27,10 @@ class GetUserSerializer(serializers.ModelSerializer):
 
     def get_organization(self, obj):
         if obj.organization:
-            return {"name": obj.organization.name}
+            return {
+                "id": obj.organization.id,
+                "name": obj.organization.name
+            }
 
         return None
 
