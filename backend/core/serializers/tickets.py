@@ -153,7 +153,9 @@ class PartialUpdateTicketSerializer(serializers.ModelSerializer):
 
             if is_assignee and not is_org_admin:
                 membership = Membership.objects.filter(
-                    user=user, organization=ticket.organization, is_active=True
+                    user=user,
+                    organization=ticket.organization,
+                    is_active=True,
                 ).first()
 
                 if membership and membership.shift_start and membership.shift_end:
