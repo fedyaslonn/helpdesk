@@ -99,7 +99,9 @@ class TicketsViewSet(viewsets.ViewSet):
                 logger.error(f"ticket:{ticket.assignee}")
 
                 ticket = Ticket.objects.select_related(
-                    "requestor", "assignee", "organization"
+                    "requestor",
+                    "assignee",
+                    "organization",
                 ).get(id=ticket.id)
 
                 if ticket.assignee:
