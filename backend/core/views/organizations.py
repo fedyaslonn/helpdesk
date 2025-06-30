@@ -60,7 +60,7 @@ class OrganizationsViewSet(viewsets.ViewSet):
                     role=Membership.Role.ADMIN,
                     is_active=True,
                 )
-
+                
                 organization = Organization.objects.prefetch_related("members").get(
                     pk=organization.id
                 )
@@ -273,7 +273,8 @@ class OrganizationsViewSet(viewsets.ViewSet):
 
             try:
                 memberships = Membership.objects.filter(
-                    organization=request.user.organization, is_active=True
+                    organization=request.user.organization,
+                    is_active=True,
                 ).select_related("user")
 
             except ObjectDoesNotExist:
