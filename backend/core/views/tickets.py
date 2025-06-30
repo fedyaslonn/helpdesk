@@ -297,7 +297,9 @@ class TicketsViewSet(viewsets.ViewSet):
     def change_assignee(self, request, pk=None):
         try:
             ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
+                "requestor",
+                "assignee",
+                "organization",
             ).get(pk=pk)
 
             if not Membership.objects.filter(
@@ -416,7 +418,9 @@ class TicketsViewSet(viewsets.ViewSet):
     def set_assignee(self, request, pk=None):
         try:
             ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
+                "requestor",
+                "assignee",
+                "organization",
             ).get(pk=pk)
 
             if not Membership.objects.filter(
