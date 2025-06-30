@@ -25,7 +25,8 @@ def update_membership_on_ticket_change(sender, instance, **kwargs):
     if previous_ticket and previous_ticket.assignee != current_ticket.assignee:
         if previous_ticket.assignee:
             membership = Membership.objects.get(
-                user=previous_ticket.assignee, organization=current_ticket.organization
+                user=previous_ticket.assignee,
+                organization=current_ticket.organization,
             )
             if previous_ticket.status in [
                 Ticket.Status.OPEN,
@@ -50,7 +51,8 @@ def update_membership_on_ticket_change(sender, instance, **kwargs):
     if previous_ticket and previous_ticket.status != current_ticket.status:
         if current_ticket.assignee:
             membership = Membership.objects.get(
-                user=current_ticket.assignee, organization=current_ticket.organization
+                user=current_ticket.assignee,
+                organization=current_ticket.organization,
             )
 
             if current_ticket.status == Ticket.Status.RESOLVED:
@@ -81,7 +83,8 @@ def update_membership_on_ticket_change(sender, instance, **kwargs):
 def update_membership_on_ticket_delete(sender, instance, **kwargs):
     if instance.assignee:
         membership = Membership.objects.get(
-            user=instance.assignee, organization=instance.organization
+            user=instance.assignee,
+            organization=instance.organization,
         )
         if instance.status in [
             Ticket.Status.OPEN,

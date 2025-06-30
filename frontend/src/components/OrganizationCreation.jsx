@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthContext"
 import { createOrganization } from "../services/organization-management-api"
 import "../styles/OrganizationCreation.css"
 
+
 const CreateOrganization = () => {
   const navigate = useNavigate()
   const { user, updateUser } = useAuth()

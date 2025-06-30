@@ -152,7 +152,9 @@ class PartialUpdateTicketSerializer(serializers.ModelSerializer):
 
             if is_assignee and not is_org_admin:
                 membership = Membership.objects.filter(
-                    user=user, organization=ticket.organization, is_active=True
+                    user=user,
+                    organization=ticket.organization,
+                    is_active=True,
                 ).first()
 
                 if membership and membership.shift_start and membership.shift_end:
@@ -160,7 +162,6 @@ class PartialUpdateTicketSerializer(serializers.ModelSerializer):
                     shift_end = membership.shift_end
 
                     if shift_start <= shift_end:
-
                         if not (shift_start <= current_time <= shift_end):
                             raise serializers.ValidationError(
                                 "You can only change status during your working shift"
