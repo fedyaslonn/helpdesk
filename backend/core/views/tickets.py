@@ -198,7 +198,9 @@ class TicketsViewSet(viewsets.ViewSet):
     def partial_update(self, request, pk=None):
         try:
             ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
+                "requestor",
+                "assignee",
+                "organization",
             ).get(pk=pk)
 
         except ObjectDoesNotExist as e:
@@ -403,7 +405,9 @@ class TicketsViewSet(viewsets.ViewSet):
     def remove_assignee(self, request, pk=None):
         try:
             ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
+                "requestor",
+                "assignee",
+                "organization",
             ).get(pk=pk)
 
             if not Membership.objects.filter(
