@@ -499,9 +499,9 @@ class TicketsViewSet(viewsets.ViewSet):
         response = GetTicketSerializer(ticket)
         return Response(data=response.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=["get"])
     def check_admin(self, request, pk=None):
-      if not request.user.is_authenticated:
+        if not request.user.is_authenticated:
             return Response(
                 {"error": "Authentication required"},
                 status=status.HTTP_401_UNAUTHORIZED,
