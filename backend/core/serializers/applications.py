@@ -1,9 +1,10 @@
-from rest_framework import serializers
-from core.models import Application, User, Organization, Membership
+from datetime import timedelta
 
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
-from datetime import timedelta
+from rest_framework import serializers
+
+from core.models import Application, Membership, Organization, User
 
 
 class CreateApplicationSerializer(serializers.ModelSerializer):
@@ -59,7 +60,8 @@ class GetApplicationSerializer(serializers.ModelSerializer):
 
     username = serializers.CharField(source="user.username", read_only=True)
     organization_name = serializers.CharField(
-        source="organization.name", read_only=True
+        source="organization.name",
+        read_only=True,
     )
     status_display = serializers.CharField(source="get_status_display", read_only=True)
 
