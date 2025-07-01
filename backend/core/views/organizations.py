@@ -60,7 +60,7 @@ class OrganizationsViewSet(viewsets.ViewSet):
                     role=Membership.Role.ADMIN,
                     is_active=True,
                 )
-                
+
                 organization = Organization.objects.prefetch_related("members").get(
                     pk=organization.id
                 )

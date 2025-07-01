@@ -1,6 +1,5 @@
-from datetime import timezone
-
 from django.core.validators import MinLengthValidator
+from django.utils import timezone
 from rest_framework import serializers
 
 from core.models import Membership, Organization, Ticket, User

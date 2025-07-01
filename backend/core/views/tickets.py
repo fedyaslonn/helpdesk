@@ -48,7 +48,9 @@ class TicketsViewSet(viewsets.ViewSet):
         try:
             user = self.request.user
             ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
+                "requestor",
+                "assignee",
+                "organization",
             ).get(pk=pk)
 
             is_requestor = ticket.requestor == user
@@ -97,7 +99,9 @@ class TicketsViewSet(viewsets.ViewSet):
                 logger.error(f"ticket:{ticket.assignee}")
 
                 ticket = Ticket.objects.select_related(
-                    "requestor", "assignee", "organization"
+                    "requestor",
+                    "assignee",
+                    "organization",
                 ).get(id=ticket.id)
 
                 if ticket.assignee:
@@ -144,7 +148,11 @@ class TicketsViewSet(viewsets.ViewSet):
 
     def update(self, request, pk=None):
         try:
-            ticket = self.retrieve(pk=pk)
+            ticket = Ticket.objects.select_related(
+                "requestor",
+                "assignee",
+                "organization",
+            ).get(pk=pk)
 
         except ObjectDoesNotExist:
             return Response(
@@ -191,7 +199,11 @@ class TicketsViewSet(viewsets.ViewSet):
 
     def partial_update(self, request, pk=None):
         try:
-            ticket = self.retrieve(pk=pk)
+            ticket = Ticket.objects.select_related(
+                "requestor",
+                "assignee",
+                "organization",
+            ).get(pk=pk)
 
         except ObjectDoesNotExist as e:
             return Response(
@@ -247,7 +259,7 @@ class TicketsViewSet(viewsets.ViewSet):
 
     def destroy(self, request, pk=None):
         try:
-            ticket = self.retrieve(pk=pk)
+            ticket = Ticket.objects.get(pk=pk)
 
             if not request.user.is_authenticated:
                 return Response(
@@ -290,7 +302,9 @@ class TicketsViewSet(viewsets.ViewSet):
     def assign(self, request, pk=None):
         try:
             ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
+                "requestor",
+                "assignee",
+                "organization",
             ).get(pk=pk)
 
             if not Membership.objects.filter(
@@ -389,7 +403,105 @@ class TicketsViewSet(viewsets.ViewSet):
         response = GetTicketSerializer(ticket)
         return Response(data=response.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=["post"])
+    def remove_assignee(self, request, pk=None):
+        try:
+            ticket = Ticket.objects.select_related(
+                "requestor",
+                "assignee",
+                "organization",
+            ).get(pk=pk)
+
+            if not Membership.objects.filter(
+                user=request.user,
+                organization=ticket.organization,
+                role=Membership.Role.ADMIN,
+                is_active=True,
+            ).exists():
+                return Response(
+                    {"error": "Only organization admins can remove assignee"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            serializer = RemoveAssigneeSerializer(data={}, context={"ticket": ticket})
+
+            old_assignee = ticket.assignee
+
+            try:
+                serializer.is_valid(raise_exception=True)
+                validated_data = serializer.validated_data
+
+            except ValidationError as e:
+                return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+
+            with transaction.atomic():
+                ticket.assignee = None
+                ticket.save()
+
+                transaction.on_commit(
+                    lambda: send_remove_assignee_notification.delay(
+                        ticket.id, old_assignee.id
+                    )
+                )
+
+        except Ticket.DoesNotExist:
+            return Response(
+                {"error": "Ticket not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        response = GetTicketSerializer(ticket)
+        return Response(data=response.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"])
+    def set_assignee(self, request, pk=None):
+        try:
+            ticket = Ticket.objects.select_related(
+                "requestor",
+                "assignee",
+                "organization",
+            ).get(pk=pk)
+
+            if not Membership.objects.filter(
+                user=request.user,
+                organization=ticket.organization,
+                role=Membership.Role.ADMIN,
+                is_active=True,
+            ).exists():
+                return Response(
+                    {"error": "Only organization admins can set assignee"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            serializer = SetAssigneeSerializer(ticket, data=request.data)
+
+            try:
+                serializer.is_valid(raise_exception=True)
+                validated_data = serializer.validated_data
+
+            except ValidationError as e:
+                return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+
+            with transaction.atomic():
+                ticket.assignee = validated_data.get("assignee")
+                ticket.save()
+
+                transaction.on_commit(
+                    lambda: send_set_assignee_notification.delay(
+                        ticket.id, ticket.assignee.id
+                    )
+                )
+
+        except Ticket.DoesNotExist:
+            return Response(
+                {"error": "Ticket not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        response = GetTicketSerializer(ticket)
+        return Response(data=response.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"])
     def check_admin(self, request, pk=None):
         if not request.user.is_authenticated:
             return Response(

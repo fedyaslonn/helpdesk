@@ -82,8 +82,7 @@ urlpatterns = [
         name="ticket-assign",
     ),
     path(
-        "tickets/<int:pk>/
-      /",
+        "tickets/<int:pk>/",
         ticket_check_admin,
         name="ticket-check-admin",
     ),
