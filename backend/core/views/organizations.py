@@ -291,7 +291,8 @@ class OrganizationsViewSet(viewsets.ViewSet):
 
             try:
                 memberships = Membership.objects.filter(
-                    organization=organization, is_active=True
+                    organization=request.user.organization,
+                    is_active=True,
                 ).select_related("user")
 
             except ObjectDoesNotExist:
