@@ -21,7 +21,9 @@ class ApplicationsViewSet(viewsets.ViewSet):
     def organization_applications(self, request):
         try:
             admin_membership = Membership.objects.get(
-                user=request.user, role=Membership.Role.ADMIN, is_active=True
+                user=request.user,
+                role=Membership.Role.ADMIN,
+                is_active=True,
             )
         except Membership.DoesNotExist:
             return Response(
@@ -54,7 +56,8 @@ class ApplicationsViewSet(viewsets.ViewSet):
     def accept_application(self, request, pk=None):
         try:
             application = Application.objects.get(
-                pk=pk, status=Application.Status.PENDING
+                pk=pk,
+                status=Application.Status.PENDING,
             )
         except Application.DoesNotExist:
             return Response(

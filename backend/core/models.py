@@ -288,13 +288,19 @@ class Application(TimestampedModel):
         REJECTED = "rejected", _("Rejected")
 
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="applications"
+        User,
+        on_delete=models.CASCADE,
+        related_name="applications",
     )
     organization = models.ForeignKey(
-        Organization, on_delete=models.CASCADE, related_name="applications"
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="applications",
     )
     status = models.CharField(
-        max_length=10, choices=Status.choices, default=Status.PENDING
+        max_length=10,
+        choices=Status.choices,
+        default=Status.PENDING,
     )
     applied_at = models.DateTimeField(auto_now_add=True)
 

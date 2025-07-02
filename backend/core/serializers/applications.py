@@ -39,12 +39,16 @@ class CreateApplicationSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("24 hours cooldown active")
 
         if Application.objects.filter(
-            user=user, organization=organization, status=Application.Status.PENDING
+            user=user,
+            organization=organization,
+            status=Application.Status.PENDING,
         ).exists():
             raise serializers.ValidationError("Application already exists")
 
         if not Membership.objects.filter(
-            organization=organization, role=Membership.Role.ADMIN, is_active=True
+            organization=organization,
+            role=Membership.Role.ADMIN,
+            is_active=True,
         ).exists():
             raise serializers.ValidationError("Organization has no active admin")
 
@@ -60,7 +64,8 @@ class GetApplicationSerializer(serializers.ModelSerializer):
 
     username = serializers.CharField(source="user.username", read_only=True)
     organization_name = serializers.CharField(
-        source="organization.name", read_only=True
+        source="organization.name",
+        read_only=True,
     )
     status_display = serializers.CharField(source="get_status_display", read_only=True)
 

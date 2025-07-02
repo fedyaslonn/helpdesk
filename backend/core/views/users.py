@@ -339,7 +339,9 @@ class UsersViewSet(viewsets.ViewSet):
                 user.save()
 
                 membership = Membership.objects.create(
-                    user=user, organization=user.organization, is_active=True
+                    user=user,
+                    organization=user.organization,
+                    is_active=True,
                 )
 
                 membership.save()
@@ -401,7 +403,9 @@ class UsersViewSet(viewsets.ViewSet):
         try:
             with transaction.atomic():
                 membership = Membership.objects.get(
-                    user=user, organization=user.organization, is_active=True
+                    user=user,
+                    organization=user.organization,
+                    is_active=True,
                 )
 
                 membership.is_active = False
@@ -437,7 +441,8 @@ class UsersViewSet(viewsets.ViewSet):
 
         except User.DoesNotExist:
             return Response(
-                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         serializer = CreateApplicationSerializer(
@@ -486,7 +491,8 @@ class UsersViewSet(viewsets.ViewSet):
 
         except Membership.DoesNotExist:
             return Response(
-                {"error": "Admin not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": "Admin not found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         except PermissionDenied as e:
@@ -575,7 +581,8 @@ class UsersViewSet(viewsets.ViewSet):
                 )
 
                 return Response(
-                    {"status": "Shift updated successfully"}, status=status.HTTP_200_OK
+                    {"status": "Shift updated successfully"},
+                    status=status.HTTP_200_OK,
                 )
 
         except DatabaseError as e:
@@ -592,7 +599,8 @@ class UsersViewSet(viewsets.ViewSet):
     @action(detail=True, methods=["post"])
     def assign_to_admin(self, request, pk=None):
         serializer = AdminAssignmentSerializer(
-            data=request.data, context={"request": request}
+            data=request.data,
+            context={"request": request},
         )
 
         try:
