@@ -1,7 +1,7 @@
 import logging
 
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import Exists, ObjectDoesNotExist, OuterRef, Prefetch, Q
+from django.db.models import Exists, F, ObjectDoesNotExist, OuterRef, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
@@ -26,6 +26,7 @@ from core.tasks import (
     send_change_assignee_notification,
     send_change_status_notification,
     send_remove_assignee_notification,
+    send_resolution_approved_notification,
     send_set_assignee_notification,
 )
 
@@ -48,7 +49,9 @@ class TicketsViewSet(viewsets.ViewSet):
         try:
             user = self.request.user
             ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
+                "requestor",
+                "assignee",
+                "organization",
             ).get(pk=pk)
 
             is_requestor = ticket.requestor == user
@@ -97,7 +100,9 @@ class TicketsViewSet(viewsets.ViewSet):
                 logger.error(f"ticket:{ticket.assignee}")
 
                 ticket = Ticket.objects.select_related(
-                    "requestor", "assignee", "organization"
+                    "requestor",
+                    "assignee",
+                    "organization",
                 ).get(id=ticket.id)
 
                 if ticket.assignee:
@@ -145,7 +150,9 @@ class TicketsViewSet(viewsets.ViewSet):
     def update(self, request, pk=None):
         try:
             ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
+                "requestor",
+                "assignee",
+                "organization",
             ).get(pk=pk)
 
         except ObjectDoesNotExist:
@@ -194,7 +201,9 @@ class TicketsViewSet(viewsets.ViewSet):
     def partial_update(self, request, pk=None):
         try:
             ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
+                "requestor",
+                "assignee",
+                "organization",
             ).get(pk=pk)
 
         except ObjectDoesNotExist as e:
@@ -218,11 +227,44 @@ class TicketsViewSet(viewsets.ViewSet):
                         setattr(ticket, attr, value)
                 ticket.save()
 
+                new_status = ticket.status
+
+                if (
+                    new_status == Ticket.Status.RESOLVED
+                    and old_status != Ticket.Status.RESOLVED
+                ):
+                    if ticket.assignee:
+                        Membership.objects.filter(
+                            user=ticket.assignee,
+                            organization=ticket.organization,
+                        ).update(
+                            resolved_tickets_count=F("resolved_tickets_count") + 1,
+                            active_tickets_count=F("active_tickets_count") - 1,
+                        )
+
+                elif (
+                    old_status == Ticket.Status.RESOLVED
+                    and new_status != Ticket.Status.RESOLVED
+                ):
+                    if ticket.assignee:
+                        Membership.objects.filter(
+                            user=ticket.assignee,
+                            organization=ticket.organization,
+                        ).update(
+                            resolved_tickets_count=F("resolved_tickets_count") - 1,
+                            active_tickets_count=F("active_tickets_count") + 1,
+                        )
+
                 if "status" in validated_data:
                     transaction.on_commit(
                         lambda: send_change_status_notification.delay(
                             ticket.id, old_status, ticket.status
                         )
+                    )
+
+                if "resolution_approved" in validated_data:
+                    transaction.on_commit(
+                        lambda: send_resolution_approved_notification.delay(ticket.id)
                     )
 
         except ValidationError as e:
@@ -294,7 +336,9 @@ class TicketsViewSet(viewsets.ViewSet):
     def assign(self, request, pk=None):
         try:
             ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
+                "requestor",
+                "assignee",
+                "organization",
             ).get(pk=pk)
 
             if not Membership.objects.filter(
@@ -320,11 +364,17 @@ class TicketsViewSet(viewsets.ViewSet):
                 data = {}
 
             if serializer_class == RemoveAssigneeSerializer:
-                serializer = serializer_class(data={}, context=context)
+                serializer = serializer_class(
+                    data={},
+                    context=context,
+                )
 
             else:
                 serializer = serializer_class(
-                    instance=ticket, data=data, context=context, partial=False
+                    instance=ticket,
+                    data=data,
+                    context=context,
+                    partial=False,
                 )
 
             try:
@@ -332,7 +382,10 @@ class TicketsViewSet(viewsets.ViewSet):
                 validated_data = serializer.validated_data
 
             except ValidationError as e:
-                return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": e.detail},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             with transaction.atomic():
                 old_assignee = ticket.assignee
@@ -391,9 +444,12 @@ class TicketsViewSet(viewsets.ViewSet):
             )
 
         response = GetTicketSerializer(ticket)
-        return Response(data=response.data, status=status.HTTP_200_OK)
+        return Response(
+            data=response.data,
+            status=status.HTTP_200_OK,
+        )
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=["get"])
     def check_admin(self, request, pk=None):
         if not request.user.is_authenticated:
             return Response(
@@ -421,10 +477,15 @@ class TicketsViewSet(viewsets.ViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_authenticated:
+        if user.is_authenticated and user.organization:
             return Ticket.objects.filter(
-                Q(organization=user.organization) | Q(requestor=self.request.user)
+                Q(organization=user.organization) | Q(requestor=user)
             ).select_related("requestor", "assignee", "organization")
+
+        else:
+            return Ticket.objects.filter(requestor=user).select_related(
+                "requestor", "assignee", "organization"
+            )
 
         return Ticket.objects.none()
 

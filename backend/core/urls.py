@@ -1,10 +1,10 @@
 from django.urls import path
 
+from core.views.applications import ApplicationsViewSet
 from core.views.comments import CommentsViewSet
 from core.views.organizations import OrganizationsViewSet
 from core.views.tickets import TicketsViewSet
 from core.views.users import UsersViewSet
-from core.views.applications import ApplicationsViewSet
 
 user_list = UsersViewSet.as_view({"get": "list", "post": "create"})
 
@@ -34,7 +34,7 @@ comment_detail = CommentsViewSet.as_view(
 
 ticket_list = TicketsViewSet.as_view({"get": "list", "post": "create"})
 
-ticket_check_admin = TicketsViewSet.as_view({"get": "admin_check"})
+ticket_check_admin = TicketsViewSet.as_view({"get": "check_admin"})
 
 ticket_detail = TicketsViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
@@ -109,16 +109,16 @@ urlpatterns = [
     path(
         "applications/organization_applications/",
         applications_list,
-        name="organization-applications"
+        name="organization-applications",
     ),
     path(
         "applications/<int:pk>/accept_application/",
         accept_application,
-        name="accept-application"
+        name="accept-application",
     ),
     path(
         "applications/<int:pk>/reject_application/",
         reject_application,
-        name="reject-application"
+        name="reject-application",
     ),
 ]
