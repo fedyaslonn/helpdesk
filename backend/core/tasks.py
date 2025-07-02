@@ -6,10 +6,13 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMultiAlternatives, send_mail
 from django.template.loader import render_to_string
+from django.utils import timezone
 from django.utils.html import strip_tags
 
 from core.services.email import (
+    send_application_notification_email,
     send_new_assignee_email,
+    send_resolution_approved_email,
     send_status_change_email,
     send_unassign_email,
 )
@@ -105,4 +108,46 @@ def send_set_assignee_notification(self, ticket_id, new_assignee_id):
 
     except Exception as e:
         logger.error(f"Failed to send notification for ticket {ticket_id}: {str(e)}")
+        self.retry(exc=e)
+
+
+@shared_task(bind=True, max_retries=MAX_RETRIES, retry_backoff=RETRY_DELAY)
+def send_apply_for_organization_notification(self, admin_email, username, org_name):
+    try:
+        if not User.objects.filter(email=admin_email).exists():
+            logger.error(f"Admin with email {admin_email} not found")
+            return
+
+        if not User.objects.filter(username=username).exists():
+            logger.error(f"User with username {username} not found")
+            return
+
+        send_application_notification_email(admin_email, username, org_name)
+
+    except Exception as e:
+        logger.error(
+            f"Failed to send notification about application to admin "
+            f"(admin_email={admin_email}, username={username}, org_name={org_name}): {str(e)}"
+        )
+        self.retry(exc=e)
+
+
+@shared_task(bind=True, max_retries=MAX_RETRIES, retry_backoff=RETRY_DELAY)
+def send_resolution_approved_notification(self, ticket_id):
+    try:
+        ticket = Ticket.objects.select_related(
+            "organization",
+            "assignee",
+            "requestor",
+        ).get(id=ticket_id)
+
+        send_resolution_approved_email(ticket)
+
+    except Ticket.DoesNotExist:
+        logger.error(f"Ticket {ticket_id} not found for notification")
+
+    except Exception as e:
+        logger.error(
+            f"Failed to send resolution notification for ticket {ticket_id}: {str(e)}"
+        )
         self.retry(exc=e)

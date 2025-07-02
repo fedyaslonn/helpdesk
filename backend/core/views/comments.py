@@ -38,8 +38,7 @@ class CommentsViewSet(viewsets.ViewSet):
 
         except Ticket.DoesNotExist:
             return Response(
-                {"error": "Ticket not found"},
-                status=status.HTTP_404_NOT_FOUND,
+                {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
         serializer = CreateCommentSerializer(data=request.data)
@@ -54,9 +53,7 @@ class CommentsViewSet(viewsets.ViewSet):
         try:
             with transaction.atomic():
                 comment = Comment.objects.create(
-                    text=validated_data["text"],
-                    author=request.user,
-                    ticket=ticket,
+                    text=validated_data["text"], author=request.user, ticket=ticket
                 )
                 comment.save()
 
@@ -92,10 +89,7 @@ class CommentsViewSet(viewsets.ViewSet):
             )
 
         serializer = UpdateCommentSerializer(
-            comment,
-            data=request.data,
-            partial=False,
-            context={"request": request},
+            comment, data=request.data, partial=False, context={"request": request}
         )
 
         try:
@@ -142,10 +136,7 @@ class CommentsViewSet(viewsets.ViewSet):
             )
 
         serializer = PartialUpdateCommentSerializer(
-            comment,
-            data=request.data,
-            partial=True,
-            context={"request": request},
+            comment, data=request.data, partial=True, context={"request": request}
         )
 
         try:
@@ -224,6 +215,5 @@ class CommentsViewSet(viewsets.ViewSet):
     def get_queryset(self):
         ticket_pk = self.kwargs.get("ticket_pk")
         return Comment.objects.filter(ticket=ticket_pk).select_related(
-            "author",
-            "ticket",
+            "author", "ticket"
         )
