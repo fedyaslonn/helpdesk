@@ -136,7 +136,9 @@ class AdminAssignmentSerializer(serializers.Serializer):
             )
 
         if not Membership.objects.filter(
-            user=user_id, organization=organization, is_active=True
+            user=user_id,
+            organization=organization,
+            is_active=True,
         ).exists():
             raise serializers.ValidationError(
                 "User is not a member of this organization"

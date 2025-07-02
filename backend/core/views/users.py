@@ -486,7 +486,8 @@ class UsersViewSet(viewsets.ViewSet):
 
         except Membership.DoesNotExist:
             return Response(
-                {"error": "Admin not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": "Admin not found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         except PermissionDenied as e:
@@ -575,7 +576,8 @@ class UsersViewSet(viewsets.ViewSet):
                 )
 
                 return Response(
-                    {"status": "Shift updated successfully"}, status=status.HTTP_200_OK
+                    {"status": "Shift updated successfully"},
+                    status=status.HTTP_200_OK,
                 )
 
         except DatabaseError as e:
@@ -592,7 +594,8 @@ class UsersViewSet(viewsets.ViewSet):
     @action(detail=True, methods=["post"])
     def assign_to_admin(self, request, pk=None):
         serializer = AdminAssignmentSerializer(
-            data=request.data, context={"request": request}
+            data=request.data,
+            context={"request": request},
         )
 
         try:

@@ -60,7 +60,9 @@ class CreateTicketSerializer(serializers.ModelSerializer):
         organization = attrs.get("organization")
 
         is_member = Membership.objects.filter(
-            user=request.user, organization=organization, is_active=True
+            user=request.user,
+            organization=organization,
+            is_active=True,
         ).exists()
 
         if is_member:
@@ -336,7 +338,9 @@ class SetAssigneeSerializer(serializers.ModelSerializer):
 
         try:
             membership = Membership.objects.get(
-                user=val, organization=ticket.organization, is_active=True
+                user=val,
+                organization=ticket.organization,
+                is_active=True,
             )
         except Membership.DoesNotExist:
             raise serializers.ValidationError(

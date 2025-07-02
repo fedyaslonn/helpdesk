@@ -186,7 +186,7 @@ def send_apply_for_organization_notification(self, admin_email, username, org_na
         email.send(fail_silently=False)
 
     except Exception as e:
-        logger.error(f"Failed to send notification about apply to admin")
+        logger.error("Failed to send notification about apply to admin")
         self.retry(exc=e)
 
 

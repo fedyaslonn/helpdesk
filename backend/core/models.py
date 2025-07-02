@@ -70,14 +70,16 @@ class TicketManager(models.Manager):
             if not candidates.exists():
                 return self.assign_to_admin(ticket)
 
-            min_active = candidates.aggregate(min_active=Min("active_tickets"))[
-                "min_active"
-            ]
+            min_active_query_result = candidates.aggregate(
+                min_active=Min("active_tickets")
+            )
+            min_active_value = min_active_query_result["min_active"]
 
-            best_candidates = candidates.filter(active_tickets=min_active)
+            best_candidates = candidates.filter(active_tickets=min_active_value)
 
             best_candidate = best_candidates.order_by(
-                models.F("last_ticket_resolved_at").asc(nulls_last=True), "id"
+                models.F("last_ticket_resolved_at").asc(nulls_last=True),
+                "id",
             ).first()
 
             if best_candidate:
@@ -221,7 +223,8 @@ class Ticket(TimestampedModel):
     )
 
     resolution_approved = models.BooleanField(
-        default=False, verbose_name=_("Resolution approved by requestor")
+        default=False,
+        verbose_name=_("Resolution approved by requestor"),
     )
 
     objects = TicketManager()
@@ -288,13 +291,19 @@ class Application(TimestampedModel):
         REJECTED = "rejected", _("Rejected")
 
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="applications"
+        User,
+        on_delete=models.CASCADE,
+        related_name="applications",
     )
     organization = models.ForeignKey(
-        Organization, on_delete=models.CASCADE, related_name="applications"
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="applications",
     )
     status = models.CharField(
-        max_length=10, choices=Status.choices, default=Status.PENDING
+        max_length=10,
+        choices=Status.choices,
+        default=Status.PENDING,
     )
     applied_at = models.DateTimeField(auto_now_add=True)
 
