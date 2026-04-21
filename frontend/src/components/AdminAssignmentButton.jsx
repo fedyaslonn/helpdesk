@@ -2,7 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { serverApi } from '../contants';
 import { apiClientInstance } from '../api/ApiClient';
-import { assignAdmin } from '../services/user-management-api'
+
 
 const AdminAssignmentButton = ({ userId, organizationId, onSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);

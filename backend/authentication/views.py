@@ -23,6 +23,11 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 
+from .serializers import UserRegistrationSerializer
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+
+
 # Create your views here.
 
 
@@ -85,3 +90,25 @@ class CheckAuthView(APIView):
 
         else:
             return Response({"user": "Unauthorized"}, status=401)
+
+
+class RegisterViewSet(viewsets.GenericViewSet):
+    """Публичный эндпоинт для регистрации новых клиентов"""
+    permission_classes = [AllowAny]  # 🔥 Доступно всем без авторизации
+    serializer_class = UserRegistrationSerializer
+
+    @action(detail=False, methods=['post'])
+    def register(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.save()
+
+        return Response({
+            'message': 'Регистрация успешна',
+            'user_id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role,
+        }, status=status.HTTP_201_CREATED)
+

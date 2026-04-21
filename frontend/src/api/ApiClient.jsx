@@ -14,7 +14,7 @@ const apiClientInstance = axios.create({
 apiClientInstance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token')
-    if (token && !config.url.includes('/authentication/token/refresh/')) {
+    if (token && !config.url.includes('/authentication/api/token/refresh/')) {
       config.headers.Authorization = `Bearer ${token}`
     }
     return config;

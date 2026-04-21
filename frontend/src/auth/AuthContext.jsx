@@ -1,9 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import apiClient from '../api/ApiClient.jsx'
+// ✅ Импортируем оба экспорта:
+import apiClient, { apiClientInstance } from '../api/ApiClient.jsx'
 
 export const AuthContext = createContext()
 
-export const useAuth = () => useContext(AuthContext)
+export const useAuth = () => {
+  const context = useContext(AuthContext)
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider')
+  }
+  return context
+}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
@@ -12,19 +19,18 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      setIsLoading(true);
+      setIsLoading(true)
       try {
+        // ✅ apiClient.checkAuth() — это метод из кастомного объекта
         const response = await apiClient.checkAuth()
-        console.log('Auth check response:', response)
 
-        if (response.user) {
+        if (response?.user) {
           setUser(response.user)
           setIsAuthenticated(true)
-
           localStorage.setItem('user_id', response.user.id)
           localStorage.setItem('email', response.user.email)
         } else {
-          setUser(null);
+          setUser(null)
           setIsAuthenticated(false)
         }
       } catch (error) {
@@ -35,28 +41,45 @@ export const AuthProvider = ({ children }) => {
         setIsLoading(false)
       }
     }
-
     checkAuth()
   }, [])
 
+  // ✅ login использует apiClientInstance для .post()
   const login = async (username, password) => {
-    try {
-      const response = await apiClient.login(username, password)
-      setUser(response.user)
-      setIsAuthenticated(true)
-      return response;
-    } catch (error) {
-      setIsAuthenticated(false)
-      throw error;
-    }
+    const response = await apiClientInstance.post('/authentication/api/token/', {
+      username,
+      password
+    })
+    const { access, refresh, user_id, email } = response.data
+
+    localStorage.setItem('access_token', access)
+    localStorage.setItem('refresh_token', refresh)
+    localStorage.setItem('user_id', user_id)
+    localStorage.setItem('email', email)
+
+    setUser({ id: user_id, email })
+    setIsAuthenticated(true)
+
+    return { access, refresh, user: { id: user_id, email } }
   }
 
   const logout = async () => {
     try {
-      await apiClient.logout()
+      const refreshToken = localStorage.getItem('refresh_token')
+      if (refreshToken) {
+        await apiClientInstance.post('/authentication/logout/', {
+          refresh_token: refreshToken
+        })
+      }
+    } catch (e) {
+      console.error('Logout error:', e)
     } finally {
       setUser(null)
       setIsAuthenticated(false)
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user_id')
+      localStorage.removeItem('email')
     }
   }
 

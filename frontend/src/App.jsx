@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth, AuthContext, AuthProvider, LoginForm, LogOutButton } from './auth';
 
-import { UsersList, UserCreate, UserUpdate, TicketsPage, OrganizationsList, CreateOrganization, TicketCreateForm, ProtectedRoute, CreateComment, TicketDetail, EditTicket, ShiftManagement, OrganizationMembers, OrganizationApplications, UserProfile, OrganizationUpdate } from './components'
+import { UsersList, UserCreate, UserUpdate, TicketsPage, OrganizationsList, CreateOrganization, TicketCreateForm, ProtectedRoute, CreateComment, TicketDetail, EditTicket, ShiftManagement, OrganizationMembers, OrganizationApplications, UserProfile, OrganizationUpdate, SignUpPage } from './components'
 import Layout from './components/Layout/Layout.jsx';
 
 
@@ -14,7 +14,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<LoginForm />} />
-        <Route path="/signup" element={<UserCreate />} />
+        <Route path="/signup" element={<SignUpPage />} />
 
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<Layout />}>

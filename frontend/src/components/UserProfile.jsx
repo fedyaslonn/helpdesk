@@ -1,100 +1,55 @@
+// src/components/UserProfile.jsx
 import { useState, useEffect } from "react";
-import '../styles/UserProfile.css';
-import { getCurrentUser, updatePassword, updateUser } from '../services/user-management-api';
+import { useAuth } from "../auth/AuthContext";
+import { getCurrentUser, updateUser } from "../services/user-management-api";
+import "../styles/UserProfile.css";
 
 function UserProfile() {
+  const { logout } = useAuth();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isEditing, setIsEditing] = useState(false);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
+  // ✅ Поля соответствуют сериализатору: full_name, contact_phone
   const [editForm, setEditForm] = useState({
     email: "",
     username: "",
-    first_name: "",
-    last_name: ""
-  });
-
-  const [passwordForm, setPasswordForm] = useState({
-    old_password: "",
-    password: "",
-    password2: ""
+    full_name: "",
+    contact_phone: "",
   });
 
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchProfile = async () => {
       try {
+        // ✅ Правильный эндпоинт: /users/me/
         const response = await getCurrentUser();
-        console.log("API Response:", response);
-        if (response.data && typeof response.data === 'object') {
-          const userData = response.data;
-          setUser(userData);
-          setEditForm({
-            email: userData.email || "",
-            username: userData.username || "",
-            first_name: userData.first_name || "",
-            last_name: userData.last_name || ""
-          });
-        } else {
-          throw new Error("Invalid user data format");
-        }
+        const userData = response.data;
+
+        setUser(userData);
+        setEditForm({
+          email: userData.email || "",
+          username: userData.username || "",
+          full_name: userData.full_name || "",
+          contact_phone: userData.contact_phone || "",
+        });
       } catch (err) {
-        setError(err.message || "Failed to load user data");
+        console.error("Failed to load profile:", err);
+        setError("Не удалось загрузить профиль");
       } finally {
         setLoading(false);
       }
     };
-
-    fetchUser();
+    fetchProfile();
   }, []);
 
   const handleEditChange = (e) => {
     const { name, value } = e.target;
-    setEditForm(prev => ({ ...prev, [name]: value }));
+    setEditForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handlePasswordChange = (e) => {
-    const { name, value } = e.target;
-    setPasswordForm(prev => ({ ...prev, [name]: value }));
-  };
-
-const handleEditSubmit = async (e) => {
-  e.preventDefault();
-  setError("");
-  setSuccess("");
-
-  if (!user) return;
-
-  try {
-    const changes = {};
-
-    if (editForm.email !== user.email) changes.email = editForm.email;
-    if (editForm.username !== user.username) changes.username = editForm.username;
-    if (editForm.first_name !== user.first_name) changes.first_name = editForm.first_name;
-    if (editForm.last_name !== user.last_name) changes.last_name = editForm.last_name;
-
-    if (Object.keys(changes).length === 0) {
-      setSuccess("No changes detected");
-      setIsEditing(false);
-      return;
-    }
-
-    const response = await updateUser(user.id, changes);
-
-    setUser({
-      ...user,
-      ...response.data
-    });
-
-    setSuccess("Profile updated successfully!");
-    setIsEditing(false);
-  } catch (err) {
-    setError(err.response?.data?.error || err.message || "Update failed");
-  }
-};
-  const handlePasswordSubmit = async (e) => {
+  const handleEditSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
@@ -102,203 +57,205 @@ const handleEditSubmit = async (e) => {
     if (!user) return;
 
     try {
-      await updatePassword(user.id, passwordForm);
-      setSuccess("Password updated successfully!");
-      setPasswordForm({
-        old_password: "",
-        password: "",
-        password2: ""
-      });
-      setIsChangingPassword(false);
+      // ✅ Собираем только изменённые поля
+      const changes = {};
+      if (editForm.email !== user.email) changes.email = editForm.email;
+      if (editForm.username !== user.username) changes.username = editForm.username;
+      if (editForm.full_name !== user.full_name) changes.full_name = editForm.full_name;
+      if (editForm.contact_phone !== user.contact_phone) changes.contact_phone = editForm.contact_phone;
+
+      if (Object.keys(changes).length === 0) {
+        setSuccess("Нет изменений для сохранения");
+        setIsEditing(false);
+        return;
+      }
+
+      // ✅ PATCH /users/{id}/
+      const response = await updateUser(user.id, changes);
+
+      setUser({ ...user, ...response.data });
+      setSuccess("Профиль успешно обновлён!");
+      setIsEditing(false);
     } catch (err) {
-      setError(err.response?.data?.error || err.message || "Password update failed");
+      console.error("Update failed:", err);
+      const errors = err.response?.data;
+      if (errors?.email) setError(errors.email[0]);
+      else if (errors?.username) setError(errors.username[0]);
+      else if (errors?.detail) setError(errors.detail);
+      else setError("Ошибка обновления профиля");
     }
   };
 
-  if (loading) return <div className="loading">Loading user data...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
-  if (!user) return <div className="error">User not found</div>;
-
-  const formatLastLogin = (dateString) => {
-    if (!dateString) return "Never logged in";
-    const date = new Date(dateString);
-    return date.toLocaleString();
+  // ✅ Форматирование даты
+  const formatDate = (dateString) => {
+    if (!dateString) return "—";
+    return new Date(dateString).toLocaleString("ru-RU", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
-  const renderOrganization = () => {
-    if (!user.organization) return "None";
-
-    if (typeof user.organization === 'string') {
-      return user.organization;
-    }
-
-    if (user.organization && typeof user.organization === 'object') {
-      return user.organization.name || "No name";
-    }
-
-    return "Invalid format";
+  // ✅ Отображение роли
+  const getRoleLabel = (role) => {
+    const labels = {
+      admin: "Администратор",
+      engineer: "Инженер поддержки",
+      client: "Клиент",
+    };
+    return labels[role] || role;
   };
+
+  if (loading) return <div className="loading">Загрузка профиля...</div>;
+  if (error) return <div className="error">Ошибка: {error}</div>;
+  if (!user) return <div className="error">Пользователь не найден</div>;
 
   return (
     <div className="user-profile">
       <div className="profile-header">
-        <h2>User Profile</h2>
+        <h2>Мой профиль</h2>
+        <span className={`role-badge role-${user.role}`}>
+          {getRoleLabel(user.role)}
+        </span>
       </div>
 
-      {!isEditing && !isChangingPassword && (
+      {!isEditing ? (
+        // 🔍 Режим просмотра
         <div className="profile-details">
-          <div className="detail-item">
-            <strong>Username:</strong> {user.username}
+          <div className="detail-row">
+            <span className="label">Логин:</span>
+            <span className="value">{user.username}</span>
           </div>
-          <div className="detail-item">
-            <strong>Email:</strong> {user.email}
+          <div className="detail-row">
+            <span className="label">Email:</span>
+            <span className="value">{user.email}</span>
           </div>
-          <div className="detail-item">
-            <strong>First Name:</strong> {user.first_name || "Not specified"}
+          <div className="detail-row">
+            <span className="label">ФИО:</span>
+            <span className="value">{user.full_name || "Не указано"}</span>
           </div>
-          <div className="detail-item">
-            <strong>Last Name:</strong> {user.last_name || "Not specified"}
+          <div className="detail-row">
+            <span className="label">Телефон:</span>
+            <span className="value">{user.contact_phone || "Не указан"}</span>
           </div>
-          <div className="detail-item">
-            <strong>Last Login:</strong> {formatLastLogin(user.last_login)}
+          <div className="detail-row">
+            <span className="label">Верификация:</span>
+            <span className={`value ${user.is_verified ? "verified" : "pending"}`}>
+              {user.is_verified ? "✅ Подтверждён" : "⏳ Ожидает проверки"}
+            </span>
           </div>
-          <div className="detail-item">
-            <strong>Organization:</strong>
-            {user.organization ? user.organization.name : "None"}
+          <div className="detail-row">
+            <span className="label">Дата регистрации:</span>
+            <span className="value">{formatDate(user.date_joined)}</span>
+          </div>
+          <div className="detail-row">
+            <span className="label">Последний вход:</span>
+            <span className="value">{formatDate(user.last_login)}</span>
           </div>
 
+          {/* ✅ Доп. информация для инженеров */}
+          {user.role === "engineer" && user.engineer_profile && (
+            <>
+              <div className="detail-row">
+                <span className="label">Макс. заявок:</span>
+                <span className="value">{user.engineer_profile.max_concurrent_tickets}</span>
+              </div>
+              <div className="detail-row">
+                <span className="label">На дежурстве:</span>
+                <span className={`value ${user.engineer_profile.is_on_duty ? "on-duty" : "off-duty"}`}>
+                  {user.engineer_profile.is_on_duty ? "✅ Да" : "❌ Нет"}
+                </span>
+              </div>
+              <div className="detail-row">
+                <span className="label">Решено заявок:</span>
+                <span className="value">{user.engineer_profile.resolved_tickets_count || 0}</span>
+              </div>
+            </>
+          )}
+
+          {/* ✅ Доп. информация для клиентов */}
+          {user.role === "client" && user.client_profile && (
+            <>
+              <div className="detail-row">
+                <span className="label">Должность:</span>
+                <span className="value">{user.client_profile.position || "Не указана"}</span>
+              </div>
+              <div className="detail-row">
+                <span className="label">ID аккаунта:</span>
+                <span className="value">{user.client_profile.account_id || "Не присвоен"}</span>
+              </div>
+            </>
+          )}
+
           <div className="profile-actions">
-            <button
-              className="btn-edit"
-              onClick={() => setIsEditing(true)}
-            >
-              Edit Profile
+            <button className="btn-edit" onClick={() => setIsEditing(true)}>
+              ✏️ Редактировать профиль
             </button>
-            <button
-              className="btn-change-password"
-              onClick={() => setIsChangingPassword(true)}
-            >
-              Change Password
+            <button className="btn-logout" onClick={logout}>
+              🚪 Выйти
             </button>
           </div>
         </div>
-      )}
-
-      {isEditing && (
+      ) : (
+        // ✏️ Режим редактирования
         <div className="edit-form">
-          <h3>Edit Profile</h3>
+          <h3>Редактирование профиля</h3>
+          {success && <div className="success-message">{success}</div>}
+          {error && <div className="error-message">{error}</div>}
+
           <form onSubmit={handleEditSubmit}>
             <div className="form-group">
-              <label>Email:</label>
+              <label>Email *</label>
               <input
                 type="email"
                 name="email"
                 value={editForm.email}
                 onChange={handleEditChange}
+                required
               />
             </div>
 
             <div className="form-group">
-              <label>Username:</label>
+              <label>Логин *</label>
               <input
                 type="text"
                 name="username"
                 value={editForm.username}
                 onChange={handleEditChange}
+                required
               />
             </div>
 
             <div className="form-group">
-              <label>First Name:</label>
+              <label>ФИО</label>
               <input
                 type="text"
-                name="first_name"
-                value={editForm.first_name}
+                name="full_name"
+                value={editForm.full_name}
                 onChange={handleEditChange}
-                placeholder="Not specified"
+                placeholder="Иванов Иван Иванович"
               />
             </div>
 
             <div className="form-group">
-              <label>Last Name:</label>
+              <label>Телефон</label>
               <input
-                type="text"
-                name="last_name"
-                value={editForm.last_name}
+                type="tel"
+                name="contact_phone"
+                value={editForm.contact_phone}
                 onChange={handleEditChange}
-                placeholder="Not specified"
+                placeholder="+7 (999) 123-45-67"
               />
             </div>
-
-            {error && <div className="error-message">{error}</div>}
-            {success && <div className="success-message">{success}</div>}
 
             <div className="form-actions">
               <button type="submit" className="btn-save">
-                Save Changes
+                💾 Сохранить изменения
               </button>
-              <button
-                type="button"
-                className="btn-cancel"
-                onClick={() => setIsEditing(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {isChangingPassword && (
-        <div className="password-form">
-          <h3>Change Password</h3>
-          <form onSubmit={handlePasswordSubmit}>
-            <div className="form-group">
-              <label>Current Password:</label>
-              <input
-                type="password"
-                name="old_password"
-                value={passwordForm.old_password}
-                onChange={handlePasswordChange}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>New Password:</label>
-              <input
-                type="password"
-                name="password"
-                value={passwordForm.password}
-                onChange={handlePasswordChange}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Confirm New Password:</label>
-              <input
-                type="password"
-                name="password2"
-                value={passwordForm.password2}
-                onChange={handlePasswordChange}
-                required
-              />
-            </div>
-
-            {error && <div className="error-message">{error}</div>}
-            {success && <div className="success-message">{success}</div>}
-
-            <div className="form-actions">
-              <button type="submit" className="btn-save">
-                Change Password
-              </button>
-              <button
-                type="button"
-                className="btn-cancel"
-                onClick={() => setIsChangingPassword(false)}
-              >
-                Cancel
+              <button type="button" className="btn-cancel" onClick={() => setIsEditing(false)}>
+                ✕ Отмена
               </button>
             </div>
           </form>

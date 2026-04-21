@@ -1,45 +1,74 @@
-import { serverApi } from '../contants'
-import { apiClientInstance } from '../api/ApiClient'
-import axios from "axios"
+// services/user-management-api.js
+import { apiClientInstance as apiClient } from '../api/ApiClient.jsx'
 
-export const getUserById = (userId) => {
-  return axios.get(`${serverApi}/helpdesk/users/${userId}/`)
-}
+// === ПОЛЬЗОВАТЕЛИ ===
 
+// Список пользователей с фильтрацией
+// GET /helpdesk/users/?role=engineer&is_verified=true&search=ivan
+export const getUsers = (params = {}) =>
+  apiClient.get('/users/', { params })
 
-export const createUser = (userData) => {
-  return axios.post(`${serverApi}/helpdesk/users/users_list/`, userData);
-}
+// Детали пользователя
+// GET /helpdesk/users/{id}/
+export const getUserById = (id) =>
+  apiClient.get(`/users/${id}/`)
 
-const api = axios.create({
-  baseURL: serverApi,
-  headers: { "Content-Type": "application/json" },
-})
+// Текущий пользователь (ОСНОВНОЙ для профиля)
+// ✅ GET /helpdesk/users/me/
+export const getCurrentUser = () =>
+  apiClient.get('/users/me/')
 
-export const getUsers = () => {
-  return axios.get(`${serverApi}/helpdesk/users/users_list/`)
-}
+// Создание пользователя (только админ!)
+// ⚠️ Для регистрации клиентов используйте registerUser()
+export const registerUser = (userData) =>
+  apiClient.post('/users/', userData)
 
-export const getCurrentUser = () => {
-  return apiClientInstance.get(`${serverApi}/helpdesk/users/me/`)
-}
+// Обновление профиля (PATCH — частичное)
+// ✅ PATCH /helpdesk/users/{id}/
+export const updateUser = (id, userData) =>
+  apiClient.patch(`/users/${id}/`, userData)
 
-export const updateUser = (userId, data) => {
-  return apiClientInstance.patch(`${serverApi}/helpdesk/users/${userId}/`, data);
-}
+// Полное обновление (если нужно)
+// ⚠️ Требует ВСЕ обязательные поля
+export const updateUserFull = (id, userData) =>
+  apiClient.put(`/users/${id}/`, userData)
 
-export const updatePassword = (userId, data) => {
-  return apiClientInstance.post(
-    `${serverApi}/helpdesk/users/${userId}/update_password/`,
-    data
-  );
-}
+// Удаление пользователя (только админ)
+// ⚠️ Необратимое действие!
+export const deleteUser = (id) =>
+  apiClient.delete(`/users/${id}/`)
 
-export const assignAdmin = (userId, organizationId) => {
-    return apiClientInstance.post(`${serverApi}/helpdesk/users/${userId}/assign_to_admin/`,
-        {
-        user_id: userId,
-        organization_id: organizationId
-      }
-  )
-}
+// Смена роли (только админ)
+// ✅ POST /helpdesk/users/{id}/change_role/
+export const changeUserRole = (id, newRole) =>
+  apiClient.post(`/users/${id}/change_role/`, { role: newRole })
+
+// Верификация (только админ)
+// ✅ POST /helpdesk/users/{id}/verify/
+export const verifyUser = (id) =>
+  apiClient.post(`/users/${id}/verify/`)
+
+// Статистика по пользователям (только админ)
+// ✅ GET /helpdesk/users/stats/
+export const getUserStats = () =>
+  apiClient.get('/users/stats/')
+
+// === ПРОФИЛИ КЛИЕНТОВ ===
+export const getClientProfiles = (params = {}) =>
+  apiClient.get('/clients/', { params })
+
+export const getClientProfile = (id) =>
+  apiClient.get(`/clients/${id}/`)
+
+// === ПРОФИЛИ ИНЖЕНЕРОВ ===
+export const getEngineerProfiles = (params = {}) =>
+  apiClient.get('/engineers/', { params })
+
+// ✅ Инженеры на дежурстве СЕЙЧАС
+export const getEngineersOnDuty = () =>
+  apiClient.get('/engineers/on_duty/')
+
+// Переключить дежурство
+// ✅ Только админ или сам инженер
+export const toggleEngineerDuty = (id) =>
+  apiClient.post(`/engineers/${id}/toggle_duty/`)
