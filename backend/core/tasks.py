@@ -16,6 +16,72 @@ User = get_user_model()
 
 
 @shared_task(bind=True, max_retries=3)
+def send_ticket_created_notification(self, ticket_id):
+    """Уведомление клиенту об успешном создании заявки"""
+    try:
+        ticket = Ticket.objects.get(pk=ticket_id)
+        user = ticket.user
+
+        context = {
+            "ticket": ticket,
+            "user": user,
+        }
+
+        # Рендерим HTML и автоматически делаем из него plain text
+        html_content = render_to_string("core/ticket_created.html", context)
+        text_content = strip_tags(html_content)
+
+        msg = EmailMultiAlternatives(
+            subject=f"Ваша заявка {ticket.ticket_number} принята в работу",
+            body=text_content,
+            from_email=settings.EMAIL_HOST_USER,
+            to=[user.email],
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+
+    except Ticket.DoesNotExist:
+        logger.error(f"Ticket {ticket_id} not found. Cannot send creation email.")
+
+    except Exception as e:
+        logger.error(f"Failed to send ticket creation notification: {str(e)}")
+        self.retry(exc=e)
+
+
+@shared_task(bind=True, max_retries=3)
+def send_ticket_resolved_notification(self, resolution_id):
+    """Уведомление клиенту о решении его заявки"""
+    try:
+        resolution = ResolutionResult.objects.get(pk=resolution_id)
+        ticket = resolution.ticket
+        user = ticket.user
+
+        context = {
+            "ticket": ticket,
+            "resolution": resolution,
+            "user": user,
+        }
+
+        html_content = render_to_string("core/ticket_resolved.html", context)
+        text_content = strip_tags(html_content)
+
+        msg = EmailMultiAlternatives(
+            subject=f"Заявка {ticket.ticket_number} успешно обработана",
+            body=text_content,
+            from_email=settings.EMAIL_HOST_USER,
+            to=[user.email],
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+
+    except ResolutionResult.DoesNotExist:
+        logger.error(f"ResolutionResult {resolution_id} not found. Cannot send resolution email.")
+
+    except Exception as e:
+        logger.error(f"Failed to send ticket resolution notification: {str(e)}")
+        self.retry(exc=e)
+
+@shared_task(bind=True, max_retries=3)
 def send_change_assignee_notification(
     self, ticket_id, old_assignee_id, new_assignee_id
 ):

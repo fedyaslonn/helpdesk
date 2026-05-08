@@ -1,6 +1,7 @@
 from rest_framework import permissions
 from rest_framework.exceptions import PermissionDenied
 from django.utils.translation import gettext_lazy as _
+from core.models import User
 
 
 class IsAdmin(permissions.BasePermission):
@@ -126,3 +127,129 @@ class CanManageRole(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user.role == 'admin'
 
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    Разрешает безопасные методы (GET, HEAD, OPTIONS) всем авторизованным.
+    Изменение (POST, PUT, PATCH, DELETE) - только администраторам.
+    """
+    def has_permission(self, request, view):
+        # Безопасные методы (чтение) разрешены всем
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        # Небезопасные (создание/изменение) - только админам
+        return bool(request.user and request.user.role == User.Role.ADMIN)
+
+class IsCommentAuthorOrAdmin(permissions.BasePermission):
+    """
+    Чтение разрешено авторизованным.
+    Изменение/удаление - только автору комментария или Админу.
+    """
+    def has_object_permission(self, request, view, obj):
+        # Безопасные методы (GET, HEAD, OPTIONS) разрешены
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        # Редактировать/Удалять может автор или админ
+        return obj.author == request.user or request.user.role == User.Role.ADMIN
+
+class SessionAccessPermission(permissions.BasePermission):
+    """
+    Удаление - только Админ.
+    Создание/Изменение - Админ или Инженер.
+    Чтение - Админ, Инженер или Автор заявки (TicketOwner).
+    """
+    def has_permission(self, request, view):
+        if view.action == 'destroy':
+            return request.user.role == User.Role.ADMIN
+        if view.action in ['create', 'update', 'partial_update', 'end_session']:
+            return request.user.role in [User.Role.ADMIN, User.Role.ENGINEER]
+        return request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        # Админ и Инженер имеют доступ к объекту
+        if request.user.role in [User.Role.ADMIN, User.Role.ENGINEER]:
+            return True
+        # Обычный юзер может только читать (SAFE_METHODS) сессии СВОЕЙ заявки
+        if request.method in permissions.SAFE_METHODS:
+            return obj.ticket.user == request.user
+        return False
+
+class ResolutionAccessPermission(permissions.BasePermission):
+    """
+    Удаление: только Админ.
+    Создание/Изменение: Админ или Инженер.
+    Чтение: Админ, Инженер или Автор заявки.
+    """
+    def has_permission(self, request, view):
+        if view.action == 'destroy':
+            return request.user.role == User.Role.ADMIN
+        if view.action in ['create', 'update', 'partial_update']:
+            return request.user.role in [User.Role.ADMIN, User.Role.ENGINEER]
+        return request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        # Админ и Инженер имеют полный доступ к объекту (с учетом ограничений выше)
+        if request.user.role in [User.Role.ADMIN, User.Role.ENGINEER]:
+            return True
+        # Обычный юзер может только читать резолюции своей заявки
+        if request.method in permissions.SAFE_METHODS:
+            return obj.ticket.user == request.user
+        return False
+
+class KBAccessPermission(permissions.BasePermission):
+    """
+    Создание: Админ или Инженер.
+    Чтение: Доступно всем (фильтрация опубликованных на уровне ViewSet).
+    Редактирование/Удаление: Только Автор или Админ.
+    Голосование: Авторизованные пользователи.
+    """
+    def has_permission(self, request, view):
+        if view.action == 'create':
+            return request.user.is_authenticated and request.user.role in ['admin', 'engineer']
+        if view.action == 'vote':
+            return request.user.is_authenticated
+        return True # Для list и retrieve пропуск, проверка внутри get_queryset
+
+    def has_object_permission(self, request, view, obj):
+        # Чтение разрешено всем (если статья опубликована). Если нет - только автору/админу/инженеру.
+        if request.method in permissions.SAFE_METHODS:
+            if not obj.is_published:
+                return request.user.is_authenticated and (request.user.role in ['admin', 'engineer'] or obj.author == request.user)
+            return True
+        
+        if view.action == 'vote':
+            return request.user.is_authenticated
+
+        # Изменение и удаление
+        return request.user.is_authenticated and (request.user.role == 'admin' or obj.author == request.user)
+
+class IsNotificationOwner(permissions.BasePermission):
+    """Доступ к уведомлению имеет только его владелец (получатель)."""
+    def has_object_permission(self, request, view, obj):
+        return obj.user == request.user
+
+class IsShiftOwnerOrAdmin(permissions.BasePermission):
+    """
+    Доступ к сменам:
+    - Админ может всё.
+    - Инженер может создавать смены и редактировать/удалять ТОЛЬКО свои.
+    """
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role in [User.Role.ADMIN, User.Role.ENGINEER]
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == User.Role.ADMIN:
+            return True
+        # Проверяем, что смена принадлежит профилю инженера текущего пользователя
+        return obj.engineer.user == request.user
+
+class IsAdminOrEngineerReadOnly(permissions.BasePermission):
+    """
+    Чтение (GET): Админ или Инженер.
+    Изменение (POST, PATCH, DELETE): Только Админ.
+    """
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return request.user.role in [User.Role.ADMIN, User.Role.ENGINEER]
+        return request.user.role == User.Role.ADMIN

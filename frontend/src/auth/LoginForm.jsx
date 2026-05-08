@@ -1,80 +1,129 @@
-import { useState } from "react"
-import { Button, Form, Input, message } from "antd"
-import { useAuth } from "../auth/AuthContext"
-import { Link } from "react-router-dom"
-import { useNavigate } from "react-router-dom"
-import "../styles/LoginForm.css"
+// src/components/LoginForm.jsx
+import React, { useState } from 'react';
+import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
+import { useAuth } from './AuthContext';
+
+import {
+  Container,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  Alert,
+  Link,
+  CircularProgress
+} from '@mui/material';
 
 export default function LoginForm() {
-  const navigate = useNavigate()
-  const { login } = useAuth()
-  const [loading, setLoading] = useState(false)
-  const [messageApi, contextHolder] = message.useMessage()
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
 
+  const from = location.state?.from?.pathname || '/helpdesk/tickets';
 
-const onFinish = async (values) => {
-  setLoading(true)
-  try {
-    await login(values.username, values.password)
-    messageApi.success("Logged in successfully")
-    navigate("/helpdesk/tickets/")
-  } catch (error) {
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('user_id')
-    localStorage.removeItem('email')
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
 
-  } finally {
-    setLoading(false)
-  }
-}
+    try {
+      await login(username, password);
+      navigate(from, { replace: true });
+    } catch (err) {
+      if (err.response?.status === 401) {
+        setError('Неверное имя пользователя или пароль');
+      } else {
+        setError('Произошла ошибка при подключении к серверу');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="login-page">
-      {contextHolder}
-      <div className="login-container">
-        <h2 className="login-title">Login</h2>
-        <Form
-          name="login"
-          initialValues={{ remember: true }}
-          onFinish={onFinish}
-          layout="vertical"
-          className="login-form"
-        >
-          <Form.Item
-            label="Username"
+    <Container component="main" maxWidth="xs">
+      <Paper 
+        elevation={6} 
+        sx={{ 
+          mt: 8, 
+          p: 4, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center',
+          borderRadius: 3 
+        }}
+      >
+        <Typography component="h1" variant="h5" sx={{ mb: 3, fontWeight: 'bold', color: '#1e293b' }}>
+          Вход в систему
+        </Typography>
+
+        {error && (
+          <Alert severity="error" sx={{ width: '100%', mb: 2, borderRadius: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="username"
+            label="Имя пользователя"
             name="username"
-            rules={[{ required: true, message: "Please input your username!" }]}
-          >
-            <Input />
-          </Form.Item>
-
-          <Form.Item
-            label="Password"
+            autoComplete="username"
+            autoFocus
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            disabled={loading}
+          />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
             name="password"
-            rules={[{ required: true, message: "Please input your password!" }]}
+            label="Пароль"
+            type="password"
+            id="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
+          />
+          
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            color="primary" // Подхватывает фиолетовый из App.jsx
+            disabled={loading}
+            sx={{ 
+              mt: 4, 
+              mb: 2, 
+              py: 1.5, 
+              fontSize: '1rem',
+              boxShadow: 3,
+              '&:hover': {
+                boxShadow: 6,
+              }
+            }}
           >
-            <Input.Password />
-          </Form.Item>
+            {loading ? <CircularProgress size={26} color="inherit" /> : 'Войти'}
+          </Button>
 
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              loading={loading}
-              block
-              disabled={loading}
-              className="login-button"
-            >
-              Log in
-            </Button>
-          </Form.Item>
-
-          <div className="signup-link">
-            <Link to="/signup">Create an account</Link>
-          </div>
-        </Form>
-      </div>
-    </div>
-  )
+          <Box textAlign="center" sx={{ mt: 1 }}>
+            <Link component={RouterLink} to="/signup" variant="body2" sx={{ textDecoration: 'none', color: 'primary.main' }}>
+              Нет аккаунта? Зарегистрироваться
+            </Link>
+          </Box>
+        </Box>
+      </Paper>
+    </Container>
+  );
 }

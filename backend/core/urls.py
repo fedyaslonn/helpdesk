@@ -4,6 +4,16 @@ from rest_framework.routers import DefaultRouter
 from core.views.tickets import TicketViewSet
 from core.views.clients import UserProfileViewSet, ClientProfileViewSet, SupportEngineerProfileViewSet
 from authentication.views import RegisterViewSet
+from core.views.categories import CategoryViewSet
+from core.views.comments import CommentViewSet
+from core.views.support_sessions import SupportSessionViewSet
+from core.views.kb import KnowledgeBaseViewSet
+from core.views.resolutions import ResolutionResultViewSet
+from core.views.sla import SLAParameterViewSet
+from core.views.notifications import NotificationViewSet
+from core.views.shifts import ShiftScheduleViewSet
+from core.views.priorities import PriorityViewSet
+
 
 
 router = DefaultRouter()
@@ -17,6 +27,19 @@ router.register(r'users', UserProfileViewSet, basename='user')
 router.register(r'clients', ClientProfileViewSet, basename='client-profile')
 router.register(r'engineers', SupportEngineerProfileViewSet, basename='engineer-profile')
 
+router.register(r'categories', CategoryViewSet, basename='category')
+router.register(r'comments', CommentViewSet, basename='comments')
+
+router.register(r'sessions', SupportSessionViewSet, basename='sessions')
+router.register(r'kb-articles', KnowledgeBaseViewSet, basename='kb')
+
+router.register(r'resolutions', ResolutionResultViewSet, basename='resolutions')
+
+router.register(r'notifications', NotificationViewSet, basename='notification')
+
+router.register(r'sla-rules', SLAParameterViewSet, basename='sla-rule')
+router.register(r'shifts', ShiftScheduleViewSet, basename='shift')
+router.register(r'priorities', PriorityViewSet, basename='priority')
 
 urlpatterns = router.urls
 

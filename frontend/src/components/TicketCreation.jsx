@@ -1,206 +1,133 @@
-import React, { useState, useEffect } from 'react'
-import { useAuth } from "../auth/AuthContext"
-import { useNavigate } from 'react-router-dom'
-import { getOrganizations, getUsers, createTicket } from '../services/ticket-management-api'
-import '../styles/TicketsPage.css'
-import { serverApi } from '../contants'
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from "../auth/AuthContext";
+import { getCategories, createTicket } from '../services/ticket-management-api';
+
+import {
+  Container, Box, Typography, TextField, Button, Paper, 
+  Alert, CircularProgress, MenuItem, Stack
+} from '@mui/material';
 
 const TicketCreateForm = () => {
   const { user } = useAuth();
-  const navigate = useNavigate()
-  const [organizations, setOrganizations] = useState([])
-  const [users, setUsers] = useState([]);
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    assignee: '',
-    organization: '',
-    status: 'OP'
-  })
+  const navigate = useNavigate();
+  
+  const [categories, setCategories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [formData, setFormData] = useState({ description: '', category: '' });
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchCategories = async () => {
       try {
-        const orgsResponse = await getOrganizations()
-        setOrganizations(orgsResponse.data);
+        const response = await getCategories();
+        const cats = response.data.results || response.data;
+        setCategories(cats);
 
-      if (orgsResponse.data.length > 0) {
-        setFormData(prev => ({
-          ...prev,
-          organization: orgsResponse.data[0].id.toString()
-        }));
-      }
-
-        const usersResponse = await getUsers()
-        setUsers(usersResponse.data);
-
-        setIsLoading(false);
+        if (cats.length > 0) {
+          setFormData(prev => ({ ...prev, category: cats[0].id.toString() }));
+        }
       } catch (err) {
-        setError('Failed to load required data')
-        console.error('Data load error:', err)
-        setIsLoading(false)
+        setError('Не удалось загрузить категории');
+      } finally {
+        setIsLoading(false);
       }
-    }
-
-    fetchData()
-  }, [])
+    };
+    fetchCategories();
+  }, []);
 
   const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value
-    }))
-  }
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.organization) {
-        setError('Organization is required');
+    if (!formData.category) {
+        setError('Необходимо выбрать категорию');
        return;
     }
-    setIsSubmitting(true)
+    setIsSubmitting(true);
     try {
       const ticketData = {
-        ...formData,
-        requestor: user.id,
-        assignee: formData.assignee ? parseInt(formData.assignee) : null,
-        organization: parseInt(formData.organization)
+        description: formData.description,
+        category: parseInt(formData.category),
+        user: user.id 
       };
-  await createTicket(ticketData)
-      navigate('/helpdesk/tickets')
+      await createTicket(ticketData);
+      navigate('/helpdesk/tickets');
     } catch (err) {
-      setError('Failed to create ticket')
-      console.error('Ticket creation error:', err)
+      setError('Ошибка при создании заявки');
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
-
-  const getStatusLabel = (status) => {
-    const statusMap = {
-      'OP': 'Открыт',
-      'IP': 'В работе',
-      'RS': 'Решено',
-      'WR': 'Ожидает ответа'
-    };
-    return statusMap[status] || status
   };
 
   if (isLoading) {
-    return <div>Loading...</div>
-  }
-
-  if (error) {
-    return <div>Error: {error}</div>
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" mt={10}>
+        <CircularProgress size={40} />
+        <Typography mt={2} color="text.secondary">Подготовка формы...</Typography>
+      </Box>
+    );
   }
 
   return (
-    <div className="ticket-form-container">
-      <div className="container">
-        <div className="row justify-content-center">
-          <div className="col-lg-8 col-xl-7">
-            <div className="ticket-form-card">
-              <div className="ticket-form-header">
-                <div className="header-icon">
-                  <i className="bi bi-ticket-perforated fs-3"></i>
-                </div>
-                <h1 className="header-title">Create new ticket</h1>
-                <p className="header-subtitle mb-0">Submit a support request</p>
-              </div>
-              <div className="ticket-form-body">
-                <form onSubmit={handleSubmit} noValidate>
-                  <div className="form-group-enhanced">
-                    <label htmlFor="title" className="form-label-enhanced">
-                      <i className="bi bi-card-heading"></i>
-                      Ticket's title
-                      <span className="required-asterisk">*</span>
-                    </label>
-                    <div className="position-relative">
-                      <input
-                        type="text"
-                        className="form-control form-control-enhanced form-control-lg-enhanced"
-                        id="title"
-                        name="title"
-                        value={formData.title}
-                        onChange={handleChange}
-                        placeholder="Describe your problem briefly"
-                        maxLength={52}
-                        required
-                      />
-                      <div className="char-counter">
-                        {formData.title.length}/52
-                      </div>
-                    </div>
-                  </div>
-                  <div className="form-group-enhanced">
-                    <label htmlFor="organization" className="form-label-enhanced">
-                      <i className="bi bi-building"></i>
-                      Organization
-                      <span className="required-asterisk">*</span>
-                    </label>
-                    <select
-                      className="form-select form-select-enhanced"
-                      id="organization"
-                      name="organization"
-                      value={formData.organization}
-                      onChange={handleChange}
-                      required
-                    >
-                      {organizations.map((org) => (
-                        <option key={org.id} value={org.id}>
-                          {org.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group-enhanced">
-                    <label htmlFor="description" className="form-label-enhanced">
-                      <i className="bi bi-card-text"></i>
-                      Problem description
-                      <span className="required-asterisk">*</span>
-                    </label>
-                    <textarea
-                      className="form-control form-control-enhanced form-textarea-enhanced"
-                      id="description"
-                      name="description"
-                      value={formData.description}
-                      onChange={handleChange}
-                      placeholder="Please describe your problem in details..."
-                      required
-                    ></textarea>
-                  </div>
-                  <div className="form-section-divider"></div>
-                  <div className="d-grid">
-                    <button
-                      type="submit"
-                      className="btn btn-submit-enhanced"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <span className="loading-spinner me-2"></span>
-                          Ticket creation...
-                        </>
-                      ) : (
-                        <>
-                          <i className="bi bi-check-circle me-2"></i>
-                          Create ticket
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+    <Container maxWidth="sm" sx={{ mt: 8, mb: 8 }}>
+      <Paper elevation={0} sx={{ p: { xs: 3, md: 5 }, border: '1px solid #e2e8f0', borderRadius: 3 }}>
+        <Typography variant="h4" fontWeight="bold" color="#1e293b" mb={3}>
+          Новая заявка
+        </Typography>
 
-export default TicketCreateForm
+        {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+        
+        <Box component="form" onSubmit={handleSubmit}>
+          <Stack spacing={3} mb={4}>
+            <TextField
+              select
+              label="Категория проблемы"
+              name="category"
+              value={formData.category}
+              onChange={handleChange}
+              fullWidth
+              required
+              sx={{ bgcolor: 'white' }}
+            >
+              {categories.map((cat) => (
+                <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              label="Подробное описание проблемы"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="Подробно опишите, с чем вы столкнулись..."
+              multiline
+              rows={6}
+              fullWidth
+              required
+              sx={{ bgcolor: 'white' }}
+            />
+          </Stack>
+
+          <Button 
+            type="submit" 
+            variant="contained" 
+            color="primary" 
+            size="large"
+            fullWidth
+            disabled={isSubmitting}
+            sx={{ fontWeight: 'bold', py: 1.5 }}
+          >
+            {isSubmitting ? 'Создание...' : 'Создать заявку'}
+          </Button>
+        </Box>
+      </Paper>
+    </Container>
+  );
+};
+
+export default TicketCreateForm;

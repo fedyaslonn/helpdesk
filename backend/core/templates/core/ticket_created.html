@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Заявка {{ ticket.ticket_number }} успешно создана</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f8fafc; color: #334155; line-height: 1.6; padding: 24px; }
+        .email-container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05); }
+        .header { background: linear-gradient(135deg, #4f46e5, #3730a3); color: white; padding: 32px 24px; text-align: center; }
+        .header h2 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+        .header p { opacity: 0.9; font-size: 16px; max-width: 80%; margin: 0 auto; }
+        .task-card { padding: 32px; border-bottom: 1px solid #e2e8f0; }
+        .greeting { font-size: 16px; margin-bottom: 24px; color: #1e293b; }
+        .detail-row { display: flex; margin-bottom: 20px; align-items: flex-start; }
+        .detail-icon { background: #e0e7ff; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 16px; color: #4338ca; font-size: 18px; flex-shrink: 0; }
+        .detail-content { flex: 1; }
+        .detail-label { font-weight: 600; color: #64748b; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .detail-value { font-size: 16px; font-weight: 500; color: #1e293b; }
+        .description-box { background: #eef2ff; border-radius: 12px; padding: 20px; margin-top: 24px; border-left: 3px solid #4f46e5; }
+        .description-box .detail-label { margin-bottom: 10px; color: #4338ca; }
+        .status-badge { display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 20px; font-weight: 600; font-size: 14px; background-color: #dbeafe; color: #1e40af; }
+        .footer { text-align: center; padding: 24px 32px; color: #64748b; font-size: 14px; background: #f8fafc; }
+        @media (max-width: 600px) {
+            .header { padding: 24px 16px; }
+            .header h2 { font-size: 22px; }
+            .task-card { padding: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h2>Ваше обращение принято</h2>
+            <p>Заявке присвоен номер {{ ticket.ticket_number }}</p>
+        </div>
+
+        <div class="task-card">
+            <p class="greeting">Здравствуйте, <strong>{{ user.full_name|default:user.username }}</strong>!</p>
+            <p style="margin-bottom: 24px;">Мы успешно зарегистрировали ваше обращение в системе поддержки. Наши специалисты скоро приступят к его обработке.</p>
+
+            <div class="detail-row">
+                <div class="detail-icon">📋</div>
+                <div class="detail-content">
+                    <div class="detail-label">Номер заявки</div>
+                    <div class="detail-value">{{ ticket.ticket_number }}</div>
+                </div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-icon">📁</div>
+                <div class="detail-content">
+                    <div class="detail-label">Категория</div>
+                    <div class="detail-value">{{ ticket.category.name }}</div>
+                </div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-icon">📌</div>
+                <div class="detail-content">
+                    <div class="detail-label">Текущий статус</div>
+                    <div class="detail-value">
+                        <span class="status-badge">{{ ticket.get_status_display }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-icon">📅</div>
+                <div class="detail-content">
+                    <div class="detail-label">Дата создания</div>
+                    <div class="detail-value">{{ ticket.created_at|date:"d M Y г. H:i" }}</div>
+                </div>
+            </div>
+
+            <div class="description-box">
+                <div class="detail-label">ОПИСАНИЕ ПРОБЛЕМЫ</div>
+                <div class="detail-value" style="font-weight: 400;">{{ ticket.description|linebreaksbr }}</div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Это автоматическое уведомление. Пожалуйста, не отвечайте на это письмо.</p>
+            <p>С уважением,<br>Служба поддержки</p>
+        </div>
+    </div>
+</body>
+</html>

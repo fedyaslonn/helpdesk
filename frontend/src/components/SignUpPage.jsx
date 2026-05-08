@@ -1,124 +1,182 @@
 // src/components/SignUpPage.jsx
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'  // 👈 Импортируем useAuth
-import { registerUser } from '../services/user-management-api'
-import { message } from 'antd'  // Опционально: для красивых уведомлений
+import React, { useState } from 'react';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
+import { registerUser } from '../services/user-management-api';
+import { message } from 'antd'; 
+
+import {
+  Container,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  Alert,
+  Link,
+  CircularProgress
+} from '@mui/material';
 
 export default function SignUpPage() {
-  const navigate = useNavigate()
-  const { login } = useAuth()  // 👈 Достаём login из контекста
+  const navigate = useNavigate();
+  const { login } = useAuth();
   
   const [form, setForm] = useState({
     username: '',
     email: '',
     password: '',
     password2: '',
-  })
-  const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(false)
+  });
+  
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setForm(prev => ({
       ...prev,
       [e.target.name]: e.target.value
-    }))
-  }
+    }));
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
     try {
-      // 1️⃣ Регистрация (возвращает только данные пользователя, БЕЗ токенов)
       await registerUser({
         username: form.username,
         email: form.email,
         password: form.password,
-        password_confirm: form.password2,  // 👈 Важно: имя поля должно совпадать с сериализатором
-      })
+        password_confirm: form.password2,
+      });
 
-      // 2️⃣ Автоматический логин после успешной регистрации
-      await login(form.username, form.password)
+      await login(form.username, form.password);
 
-      message.success('Регистрация успешна!')
-      navigate('/helpdesk/tickets')
+      message.success('Регистрация успешна!');
+      navigate('/helpdesk/tickets');
 
     } catch (err) {
-      // 🔥 Показываем конкретные ошибки валидации
-      const errors = err.response?.data
-      if (errors?.email) setError(errors.email[0])
-      else if (errors?.username) setError(errors.username[0])
-      else if (errors?.password) setError(errors.password[0])
-      else if (errors?.password_confirm) setError(errors.password_confirm[0])
-      else if (errors?.detail) setError(errors.detail)
-      else setError('Ошибка регистрации. Попробуйте позже.')
+      const errors = err.response?.data;
+      if (errors?.email) setError(errors.email[0]);
+      else if (errors?.username) setError(errors.username[0]);
+      else if (errors?.password) setError(errors.password[0]);
+      else if (errors?.password_confirm) setError(errors.password_confirm[0]);
+      else if (errors?.detail) setError(errors.detail);
+      else setError('Ошибка регистрации. Попробуйте позже.');
 
-      message.error('Регистрация не удалась')
+      message.error('Регистрация не удалась');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="signup-container">
-      <h2>Регистрация</h2>
+    <Container component="main" maxWidth="xs">
+      <Paper 
+        elevation={6} 
+        sx={{ 
+          mt: 8, 
+          p: 4, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center',
+          borderRadius: 3 
+        }}
+      >
+        <Typography component="h1" variant="h5" sx={{ mb: 3, fontWeight: 'bold', color: '#1e293b' }}>
+          Регистрация
+        </Typography>
 
-      {error && <div className="error-message">{error}</div>}
+        {error && (
+          <Alert severity="error" sx={{ width: '100%', mb: 2, borderRadius: 2 }}>
+            {error}
+          </Alert>
+        )}
 
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Имя пользователя</label>
-          <input
+        <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="username"
+            label="Имя пользователя"
             name="username"
+            autoComplete="username"
+            autoFocus
             value={form.username}
             onChange={handleChange}
-            required
             disabled={loading}
           />
-        </div>
 
-        <div className="form-group">
-          <label>Email</label>
-          <input
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="email"
+            label="Электронная почта"
             name="email"
             type="email"
+            autoComplete="email"
             value={form.email}
             onChange={handleChange}
-            required
             disabled={loading}
           />
-        </div>
 
-        <div className="form-group">
-          <label>Пароль</label>
-          <input
+          <TextField
+            margin="normal"
+            required
+            fullWidth
             name="password"
+            label="Пароль"
             type="password"
+            id="password"
+            autoComplete="new-password"
             value={form.password}
             onChange={handleChange}
-            required
             disabled={loading}
           />
-        </div>
 
-        <div className="form-group">
-          <label>Подтвердите пароль</label>
-          <input
+          <TextField
+            margin="normal"
+            required
+            fullWidth
             name="password2"
+            label="Подтвердите пароль"
             type="password"
+            id="password2"
             value={form.password2}
             onChange={handleChange}
-            required
             disabled={loading}
           />
-        </div>
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Регистрация...' : 'Зарегистрироваться'}
-        </button>
-      </form>
-    </div>
-  )
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            color="primary" // MUI сам подхватит наш фиолетовый цвет из темы!
+            disabled={loading}
+            sx={{ 
+              mt: 4, 
+              mb: 2, 
+              py: 1.5, 
+              fontSize: '1rem',
+              boxShadow: 3,
+              '&:hover': {
+                boxShadow: 6, // Красивая тень при наведении
+              }
+            }}
+          >
+            {loading ? <CircularProgress size={26} color="inherit" /> : 'Зарегистрироваться'}
+          </Button>
+
+          <Box textAlign="center" sx={{ mt: 1 }}>
+            <Link component={RouterLink} to="/login" variant="body2" sx={{ textDecoration: 'none', color: 'primary.main' }}>
+              Уже есть аккаунт? Войти
+            </Link>
+          </Box>
+        </Box>
+      </Paper>
+    </Container>
+  );
 }

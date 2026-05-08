@@ -11,32 +11,39 @@ export const getUsers = () => {
   return apiClientInstance.get(`${serverApi}/helpdesk/users/users_list/`)
 }
 
-export const createTicket = (ticketData) => {
-  return apiClientInstance.post(`${serverApi}/helpdesk/tickets/tickets_list/`, ticketData)
-}
+export const getTickets = (params = {}) => apiClientInstance.get('/helpdesk/tickets/', { params })
+export const getTicketDetails = (id) => apiClientInstance.get(`/helpdesk/tickets/${id}/`)
+export const createTicket = (ticketData) => apiClientInstance.post('/helpdesk/tickets/', ticketData)
+export const updateTicket = (id, data) => apiClientInstance.patch(`/helpdesk/tickets/${id}/`, data)
+export const deleteTicket = (id) => apiClientInstance.delete(`/helpdesk/tickets/${id}/`)
 
-export const getTickets = (params = {}) => {
-  return apiClientInstance.get('/helpdesk/tickets/tickets_list/', { params });
-};
+export const assignTicket = (ticketId, engineerId) => 
+  apiClientInstance.post(`/helpdesk/tickets/${ticketId}/assign/`, { engineer_id: engineerId })
+
+export const autoAssignTicket = (ticketId) => 
+  apiClientInstance.post(`/helpdesk/tickets/auto_assign/`, { ticket_id: ticketId })
+
+export const closeTicket = (ticketId) => 
+  apiClientInstance.post(`/helpdesk/tickets/${ticketId}/close/`)
+
+// === КАТЕГОРИИ (вместо организаций) ===
+export const getCategories = () => apiClientInstance.get('/helpdesk/categories/')
+
+// === КОММЕНТАРИИ ===
+export const getTicketComments = (ticketId) => apiClientInstance.get(`/helpdesk/tickets/${ticketId}/comments/`)
+export const addTicketComment = (ticketId, text) => apiClientInstance.post(`/helpdesk/tickets/${ticketId}/comments/`, { content: text })
+
+// === ИНЖЕНЕРЫ (для назначения) ===
+// Вызываем эндпоинт инженеров, чтобы получить список кандидатов
+export const getEngineers = () => apiClientInstance.get('/helpdesk/engineers/')
+
 
 export const getCurrentUser = () => {
   return apiClientInstance.get('/helpdesk/users/me/');
 };
 
-export const getTicket = (id) => {
-  return apiClientInstance.get(`${serverApi}/helpdesk/tickets/${id}/`)
-}
-
-export const updateTicket = (id, data) => {
-    return apiClientInstance.put(`${serverApi}/helpdesk/tickets/${id}/`, data)
-}
-
 export const getMembers = (orgId) => {
     return apiClientInstance.get(`${serverApi}/helpdesk/organizations/${orgId}/members/`)
-}
-
-export const getTicketComments = (id) => {
-  return apiClientInstance.get(`/helpdesk/tickets/${id}/comments/`)
 }
 
 export const removeTicketAssignee = (id) => {
@@ -47,16 +54,9 @@ export const updateTicketStatus = (id, status) => {
   return apiClientInstance.patch(`/helpdesk/tickets/${id}/`, { status })
 }
 
-export const addTicketComment = (id, text) => {
-  return apiClientInstance.post(`/helpdesk/tickets/${id}/comments/`, { text })
-}
 
 export const deleteTicketComment = (ticketId, commentId) => {
   return apiClientInstance.delete(`/helpdesk/tickets/${ticketId}/comments/${commentId}/`)
-}
-
-export const getTicketDetails = (id) => {
-  return apiClientInstance.get(`/helpdesk/tickets/${id}/`)
 }
 
 export const updateTicketComment = (ticketId, commentId, text) => {
@@ -64,3 +64,51 @@ export const updateTicketComment = (ticketId, commentId, text) => {
         text: text
     })
 }
+
+export const getCategoryDetails = (id) => apiClientInstance.get(`/helpdesk/categories/${id}/`)
+export const createCategory = (data) => apiClientInstance.post('/helpdesk/categories/', data)
+export const updateCategory = (id, data) => apiClientInstance.patch(`/helpdesk/categories/${id}/`, data)
+export const deleteCategory = (id) => apiClientInstance.delete(`/helpdesk/categories/${id}/`)
+
+export const getComments = (params = {}) => apiClientInstance.get('/helpdesk/comments/', { params })
+export const createComment = (data) => apiClientInstance.post('/helpdesk/comments/', data)
+export const updateComment = (id, data) => apiClientInstance.patch(`/helpdesk/comments/${id}/`, data)
+export const deleteComment = (id) => apiClientInstance.delete(`/helpdesk/comments/${id}/`)
+
+export const getSessions = (params = {}) => apiClientInstance.get('/helpdesk/sessions/', { params })
+export const createSession = (data) => apiClientInstance.post('/helpdesk/sessions/', data)
+export const updateSession = (id, data) => apiClientInstance.patch(`/helpdesk/sessions/${id}/`, data)
+export const deleteSession = (id) => apiClientInstance.delete(`/helpdesk/sessions/${id}/`)
+export const endSession = (id) => apiClientInstance.post(`/helpdesk/sessions/${id}/end_session/`)
+
+export const getResolutions = (params = {}) => apiClientInstance.get('/helpdesk/resolutions/', { params })
+export const createResolution = (data) => apiClientInstance.post('/helpdesk/resolutions/', data)
+export const updateResolution = (id, data) => apiClientInstance.patch(`/helpdesk/resolutions/${id}/`, data)
+export const deleteResolution = (id) => apiClientInstance.delete(`/helpdesk/resolutions/${id}/`)
+
+export const getKBArticles = (params = {}) => apiClientInstance.get('/helpdesk/kb-articles/', { params })
+export const getKBArticleDetails = (id) => apiClientInstance.get(`/helpdesk/kb-articles/${id}/`)
+export const createKBArticle = (data) => apiClientInstance.post('/helpdesk/kb-articles/', data)
+export const updateKBArticle = (id, data) => apiClientInstance.patch(`/helpdesk/kb-articles/${id}/`, data)
+export const deleteKBArticle = (id) => apiClientInstance.delete(`/helpdesk/kb-articles/${id}/`)
+export const voteKBArticle = (id, data) => apiClientInstance.post(`/helpdesk/kb-articles/${id}/vote/`, data)
+
+export const getNotifications = (params = {}) => apiClientInstance.get('/helpdesk/notifications/', { params })
+export const markAllNotificationsRead = () => apiClientInstance.post('/helpdesk/notifications/mark_all_read/')
+export const markNotificationRead = (id) => apiClientInstance.post(`/helpdesk/notifications/${id}/mark_read/`)
+export const deleteNotification = (id) => apiClientInstance.delete(`/helpdesk/notifications/${id}/`)
+
+export const getPriorities = () => apiClientInstance.get('/helpdesk/priorities/');
+export const createPriority = (data) => apiClientInstance.post('/helpdesk/priorities/', data);
+export const updatePriority = (id, data) => apiClientInstance.patch(`/helpdesk/priorities/${id}/`, data);
+export const deletePriority = (id) => apiClientInstance.delete(`/helpdesk/priorities/${id}/`);
+
+export const getShifts = (params = {}) => apiClientInstance.get('/helpdesk/shifts/', { params });
+export const createShift = (data) => apiClientInstance.post('/helpdesk/shifts/', data);
+export const updateShift = (id, data) => apiClientInstance.patch(`/helpdesk/shifts/${id}/`, data);
+export const deleteShift = (id) => apiClientInstance.delete(`/helpdesk/shifts/${id}/`);
+export const getTodayShifts = () => apiClientInstance.get('/helpdesk/shifts/today/');
+
+export const approveResolution = (id) => axiosInstance.post(`/tickets/${id}/approve_resolution/`);
+
+export const unassignTicket = (id) => axiosInstance.post(`/tickets/${id}/unassign/`);

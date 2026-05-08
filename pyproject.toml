@@ -1,5 +1,5 @@
 [project]
-name = "help-desk"
+name = "helpdesk"
 version = "0.1.0"
 description = ""
 authors = [
@@ -25,6 +25,11 @@ dependencies = [
     "celery (>=5.5.3,<6.0.0)"
 ]
 
+packages = [
+    { include = "helpdesk", from = "backend" },
+    { include = "authentication", from = "backend" },
+    { include = "core", from = "backend" },
+]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

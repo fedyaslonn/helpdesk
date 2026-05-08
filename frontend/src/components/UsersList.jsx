@@ -1,23 +1,47 @@
-// src/components/UsersList.jsx
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
 import { getUsers } from "../services/user-management-api";
-import "../styles/UsersList.css";
 
-function UsersList() {
+// Импортируем компоненты MUI
+import {
+  Container,
+  Box,
+  Typography,
+  Tabs,
+  Tab,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Avatar,
+  Chip,
+  Button,
+  CircularProgress,
+  Alert,
+  Stack
+} from "@mui/material";
+
+const UsersList = () => {
+  const { user: authUser } = useAuth();
+  const isAdmin = authUser?.role === "admin";
+
   const [users, setUsers] = useState([]);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState({ next: null, previous: null, count: 0 });
 
-  // ✅ Фильтры по роли (вместо организации)
   const [selectedFilter, setSelectedFilter] = useState("all");
 
   const filterOptions = [
-    { value: "all", label: "Все пользователи", icon: "👥" },
-    { value: "admin", label: "Администраторы", icon: "👑" },
-    { value: "engineer", label: "Инженеры", icon: "🔧" },
-    { value: "client", label: "Клиенты", icon: "👤" },
-    { value: "verified", label: "Верифицированные", icon: "✅" },
+    { value: "all", label: "Все пользователи" },
+    { value: "admin", label: "Администраторы" },
+    { value: "engineer", label: "Инженеры" },
+    { value: "client", label: "Клиенты" },
+    { value: "verified", label: "Верифицированные" },
   ];
 
   useEffect(() => {
@@ -26,7 +50,6 @@ function UsersList() {
       setError(null);
 
       try {
-        // ✅ Параметры фильтрации для сервера
         const params = {};
         if (selectedFilter === "verified") {
           params.is_verified = true;
@@ -37,7 +60,6 @@ function UsersList() {
         const response = await getUsers(params);
         const data = response.data;
 
-        // ✅ Поддержка пагинации DRF
         if (data.results) {
           setUsers(data.results);
           setPagination({
@@ -59,12 +81,8 @@ function UsersList() {
     fetchUsers();
   }, [selectedFilter]);
 
-  const handleFilterChange = (value) => {
-    setSelectedFilter(value);
-  };
-
-  const clearFilter = () => {
-    setSelectedFilter("all");
+  const handleFilterChange = (event, newValue) => {
+    setSelectedFilter(newValue);
   };
 
   const loadPage = async (url) => {
@@ -91,7 +109,6 @@ function UsersList() {
     }
   };
 
-  // ✅ Отображение роли
   const getRoleLabel = (role) => {
     const labels = {
       admin: "Администратор",
@@ -101,145 +118,203 @@ function UsersList() {
     return labels[role] || role;
   };
 
+  const getRoleColor = (role) => {
+    switch (role) {
+      case "admin": return "error";
+      case "engineer": return "warning";
+      case "client": return "primary";
+      default: return "default";
+    }
+  };
+
   if (error) {
     return (
-      <div className="users-container">
-        <div className="error-message">
-          <div className="error-icon">⚠️</div>
-          <h3>Ошибка загрузки</h3>
-          <p>{error}</p>
-          <button className="btn-primary" onClick={() => window.location.reload()}>
-            Попробовать снова
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading && users.length === 0) {
-    return (
-      <div className="users-container">
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <p>Загрузка пользователей...</p>
-        </div>
-      </div>
+      <Container maxWidth="lg" sx={{ mt: 4 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+        <Button variant="contained" onClick={() => window.location.reload()}>
+          Попробовать снова
+        </Button>
+      </Container>
     );
   }
 
   return (
-    <div className="users-container">
-      <div className="page-header">
-        <h1 className="page-title">Список пользователей</h1>
-        <span className="results-count">
-          Найдено: <strong>{pagination.count || users.length}</strong>
-        </span>
-      </div>
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 8 }}>
+      
+      {/* Заголовок страницы */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+        <Typography variant="h4" fontWeight="bold" color="#1e293b">
+          Список пользователей
+        </Typography>
+        <Chip 
+          label={`Найдено: ${pagination.count || users.length}`} 
+          color="default" 
+          variant="outlined" 
+          sx={{ fontWeight: "bold" }}
+        />
+      </Box>
 
-      {/* 🔍 Фильтры */}
-      <div className="filters-section">
-        <div className="filters-header">
-          <span className="filters-title">🔎 Фильтр по роли</span>
-          {selectedFilter !== "all" && (
-            <button className="clear-filters-btn" onClick={clearFilter}>
-              ✕ Сбросить
-            </button>
-          )}
-        </div>
-        <div className="filter-buttons">
+      {/* Панель фильтров */}
+      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 4 }}>
+        <Tabs 
+          value={selectedFilter} 
+          onChange={handleFilterChange} 
+          variant="scrollable"
+          scrollButtons="auto"
+          textColor="primary"
+          indicatorColor="primary"
+        >
           {filterOptions.map((option) => (
-            <button
-              key={option.value}
-              className={`filter-btn ${selectedFilter === option.value ? "active" : ""}`}
-              onClick={() => handleFilterChange(option.value)}
-              title={option.description}
-            >
-              <span className="filter-icon">{option.icon}</span>
-              {option.label}
-            </button>
+            <Tab 
+              key={option.value} 
+              value={option.value} 
+              label={option.label} 
+              sx={{ textTransform: "none", fontWeight: "medium", fontSize: "0.95rem" }}
+            />
           ))}
-        </div>
-      </div>
+        </Tabs>
+      </Box>
 
-      {/* 📋 Таблица пользователей */}
-      {users.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">🔍</div>
-          <h3>Пользователи не найдены</h3>
-          <p>Попробуйте изменить параметры фильтрации</p>
+      {/* Состояние загрузки, пустого списка или таблица */}
+      {isLoading && users.length === 0 ? (
+        <Box display="flex" flexDirection="column" alignItems="center" mt={10}>
+          <CircularProgress size={50} color="primary" />
+          <Typography mt={2} color="text.secondary">Загрузка пользователей...</Typography>
+        </Box>
+      ) : users.length === 0 ? (
+        <Paper elevation={0} sx={{ p: 6, textAlign: "center", bgcolor: "#f8fafc", borderRadius: 3, border: "1px dashed #cbd5e1" }}>
+          <Typography variant="h6" color="#334155" gutterBottom>
+            Пользователи не найдены
+          </Typography>
+          <Typography color="text.secondary" mb={3}>
+            Попробуйте изменить параметры фильтрации
+          </Typography>
           {selectedFilter !== "all" && (
-            <button className="btn-secondary" onClick={clearFilter}>
+            <Button variant="outlined" onClick={() => setSelectedFilter("all")}>
               Показать всех
-            </button>
+            </Button>
           )}
-        </div>
+        </Paper>
       ) : (
-        <div className="users-table">
-          <div className="table-header">
-            <div className="col-user">Пользователь</div>
-            <div className="col-role">Роль</div>
-            <div className="col-status">Статус</div>
-            <div className="col-date">Дата регистрации</div>
-          </div>
+        <>
+          <TableContainer component={Paper} elevation={1} sx={{ borderRadius: 2, border: "1px solid #e2e8f0" }}>
+            <Table sx={{ minWidth: 800 }}>
+              <TableHead sx={{ bgcolor: "#f8fafc" }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: "bold", color: "#475569" }}>Пользователь</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: "#475569" }}>Роль</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: "#475569" }}>Статус</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: "#475569" }}>Дата регистрации</TableCell>
+                  {isAdmin && <TableCell sx={{ fontWeight: "bold", color: "#475569", textAlign: "right" }}>Действия</TableCell>}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow key={user.id} hover sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
+                    
+                    {/* Колонка: Пользователь */}
+                    <TableCell>
+                      <Box display="flex" alignItems="center" gap={2}>
+                        <Avatar sx={{ bgcolor: "primary.light", fontWeight: "bold", width: 40, height: 40 }}>
+                          {user.username ? user.username.charAt(0).toUpperCase() : "?"}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight="bold" color="#0f172a">
+                            {user.username || "Без имени"}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {user.email || "Нет email"}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
 
-          {users.map((user) => (
-            <div key={user.id} className="user-row">
-              <div className="col-user">
-                <div className="user-info">
-                  <div className="avatar">{user.username?.[0]?.toUpperCase() || "?"}</div>
-                  <div className="user-details">
-                    <div className="username">{user.username || "Без имени"}</div>
-                    <div className="email">{user.email || "Нет email"}</div>
-                  </div>
-                </div>
-              </div>
+                    {/* Колонка: Роль */}
+                    <TableCell>
+                      <Chip 
+                        label={getRoleLabel(user.role)} 
+                        color={getRoleColor(user.role)} 
+                        size="small" 
+                        sx={{ fontWeight: "medium", borderRadius: 1.5 }} 
+                      />
+                    </TableCell>
 
-              <div className="col-role">
-                <span className={`role-badge role-${user.role}`}>
-                  {getRoleLabel(user.role)}
-                </span>
-              </div>
+                    {/* Колонка: Статус */}
+                    <TableCell>
+                      {user.is_verified ? (
+                        <Chip label="Верифицирован" color="success" variant="outlined" size="small" />
+                      ) : (
+                        <Chip label="Ожидает" color="default" variant="outlined" size="small" />
+                      )}
+                    </TableCell>
 
-              <div className="col-status">
-                {user.is_verified ? (
-                  <span className="status-verified">✅ Верифицирован</span>
-                ) : (
-                  <span className="status-pending">⏳ Ожидает</span>
-                )}
-              </div>
+                    {/* Колонка: Дата регистрации */}
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {user.date_joined ? new Date(user.date_joined).toLocaleDateString("ru-RU") : "—"}
+                      </Typography>
+                    </TableCell>
 
-              <div className="col-date">
-                {user.date_joined ? new Date(user.date_joined).toLocaleDateString("ru-RU") : "—"}
-              </div>
-            </div>
-          ))}
-        </div>
+                    {/* Колонка: Действия (Админ) */}
+                    {isAdmin && (
+                      <TableCell align="right">
+                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                          <Button 
+                            component={RouterLink} 
+                            to={`/users/${user.id}`} 
+                            variant="outlined" 
+                            size="small"
+                            color="inherit"
+                          >
+                            Профиль
+                          </Button>
+                          <Button 
+                            component={RouterLink} 
+                            to={`/users/update/${user.id}`} 
+                            variant="contained" 
+                            size="small"
+                            color="primary"
+                            disableElevation
+                          >
+                            Управление
+                          </Button>
+                        </Stack>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* Пагинация */}
+          {(pagination.next || pagination.previous) && (
+            <Box display="flex" justifyContent="center" alignItems="center" gap={2} mt={4}>
+              <Button
+                variant="outlined"
+                disabled={!pagination.previous || isLoading}
+                onClick={() => loadPage(pagination.previous)}
+              >
+                Назад
+              </Button>
+              <Typography variant="body2" color="text.secondary">
+                Страница {pagination.previous ? 2 : 1}
+              </Typography>
+              <Button
+                variant="outlined"
+                disabled={!pagination.next || isLoading}
+                onClick={() => loadPage(pagination.next)}
+              >
+                Вперёд
+              </Button>
+            </Box>
+          )}
+        </>
       )}
-
-      {/* 📄 Пагинация */}
-      {(pagination.next || pagination.previous) && (
-        <div className="pagination">
-          <button
-            className="btn-page"
-            disabled={!pagination.previous || isLoading}
-            onClick={() => loadPage(pagination.previous)}
-          >
-            ← Назад
-          </button>
-          <span className="page-info">
-            Страница {pagination.previous ? 2 : 1}
-          </span>
-          <button
-            className="btn-page"
-            disabled={!pagination.next || isLoading}
-            onClick={() => loadPage(pagination.next)}
-          >
-            Вперёд →
-          </button>
-        </div>
-      )}
-    </div>
+    </Container>
   );
-}
+};
 
 export default UsersList;

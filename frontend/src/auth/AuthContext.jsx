@@ -13,22 +13,41 @@ export const useAuth = () => {
 }
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  // ✅ 1. Инициализируем стейт сразу из localStorage
+  // Это уберет мигание интерфейса и сразу даст права админа до завершения checkAuth
+  const [user, setUser] = useState(() => {
+    const id = localStorage.getItem('user_id');
+    const email = localStorage.getItem('email');
+    const role = localStorage.getItem('role');
+    return id ? { id, email, role } : null;
+  })
+  
+  // Инициализируем статус авторизации на основе наличия токена
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('access_token'))
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const checkAuth = async () => {
       setIsLoading(true)
       try {
-        // ✅ apiClient.checkAuth() — это метод из кастомного объекта
         const response = await apiClient.checkAuth()
 
         if (response?.user) {
-          setUser(response.user)
+          // ✅ 2. Подтягиваем сохраненную роль на случай, если бэкенд её не передал в checkAuth
+          const savedRole = localStorage.getItem('role');
+          const fullUser = {
+            ...response.user,
+            role: response.user.role || savedRole
+          };
+
+          setUser(fullUser)
           setIsAuthenticated(true)
-          localStorage.setItem('user_id', response.user.id)
-          localStorage.setItem('email', response.user.email)
+          
+          localStorage.setItem('user_id', fullUser.id)
+          localStorage.setItem('email', fullUser.email)
+          if (fullUser.role) {
+            localStorage.setItem('role', fullUser.role)
+          }
         } else {
           setUser(null)
           setIsAuthenticated(false)
@@ -44,7 +63,6 @@ export const AuthProvider = ({ children }) => {
     checkAuth()
   }, [])
 
-  // ✅ login использует apiClientInstance для .post()
   const login = async (username, password) => {
     const response = await apiClientInstance.post('/authentication/api/token/', {
       username,
@@ -57,10 +75,26 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user_id', user_id)
     localStorage.setItem('email', email)
 
-    setUser({ id: user_id, email })
+    try {
+      // Используем токен, который только что получили, так как он еще не успел попасть в глобальный перехватчик (interceptor)
+      const profileResponse = await apiClientInstance.get('/helpdesk/users/me/', {
+        headers: {
+          Authorization: `Bearer ${access}`
+        }
+      });
+      const fullUser = profileResponse.data;
+      
+      setUser(fullUser); 
+      localStorage.setItem('role', fullUser.role); 
+    } catch (err) {
+      console.error('Failed to fetch user profile during login', err);
+      // Если профиль не загрузился, ставим хотя бы базовые данные
+      setUser({ id: user_id, email }); 
+    }
+
     setIsAuthenticated(true)
 
-    return { access, refresh, user: { id: user_id, email } }
+    return { access, refresh }
   }
 
   const logout = async () => {
@@ -80,6 +114,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('refresh_token')
       localStorage.removeItem('user_id')
       localStorage.removeItem('email')
+      localStorage.removeItem('role') // ✅ 3. Очищаем роль при выходе!
     }
   }
 

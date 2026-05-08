@@ -5,12 +5,18 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+
+from core.filters.users import UserFilter
+
 from core.models import User, Client, SupportEngineer
 from core.serializers.clients import (
     UserListSerializer, UserDetailSerializer, UserCreateSerializer,
     UserUpdateSerializer, ClientProfileSerializer, SupportEngineerProfileSerializer
 )
 from ..permissions import IsAdminOrSelf, IsAdminOrEngineerSelf, CanManageRole
+from django.db.models import Count, Q
 
 
 class UserProfileViewSet(
@@ -32,6 +38,11 @@ class UserProfileViewSet(
     - DELETE /users/{id}/ - удаление (только админ)
     """
     permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = UserFilter
+    search_fields = ['username', 'email', 'full_name'] # Поиск ?search=...
+    ordering_fields = ['date_joined', 'role']          # Сортировка ?ordering=...
+    ordering = ['-date_joined']                        # Сортировка по умолчанию
 
     def get_queryset(self):
         queryset = User.objects.select_related('client_profile', 'engineer_profile')
@@ -50,11 +61,17 @@ class UserProfileViewSet(
         return UserDetailSerializer
 
     def get_permissions(self):
-        if self.action == 'create':
+        # Добавляем разрешение для нового экшена
+        if self.action == 'register':
+            return [AllowAny()]
+            
+        elif self.action == 'create':
             return [IsAuthenticated(), CanManageRole()]  # Только админ создаёт
         elif self.action in ['update', 'partial_update', 'destroy']:
             return [IsAuthenticated(), IsAdminOrSelf()]
+        
         return [IsAuthenticated()]
+
 
     def perform_create(self, serializer):
         # Дополнительная логика при создании (например, логирование)
@@ -100,6 +117,23 @@ class UserProfileViewSet(
             'new_role': new_role
         })
 
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def register(self, request):
+        """Открытый эндпоинт для регистрации новых клиентов"""
+        serializer = UserCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Принудительно задаем роль клиента, чтобы никто не мог зарегистрироваться как админ
+        user = serializer.save(role='client')
+        
+        # Автоматически создаем профиль клиента
+        Client.objects.get_or_create(user=user)
+        
+        return Response(
+            {"message": "Регистрация успешна", "user_id": user.id}, 
+            status=status.HTTP_201_CREATED
+        )
+
     @action(detail=True, methods=['post'], permission_classes=[CanManageRole])
     def verify(self, request, pk=None):
         """Верификация пользователя админом"""
@@ -137,42 +171,65 @@ class ClientProfileViewSet(viewsets.ModelViewSet):
 
 class SupportEngineerProfileViewSet(viewsets.ModelViewSet):
     """
-    Отдельный ViewSet для управления профилями инженеров.
+    Управление профилями инженеров.
+    Базовый URL: /helpdesk/engineers/
     """
     serializer_class = SupportEngineerProfileSerializer
-    permission_classes = [IsAdminOrEngineerSelf]
-
+    
+    # ✅ Применяем твой класс пермишенов ко всему ViewSet
+    permission_classes = [IsAuthenticated, IsAdminOrEngineerSelf]
+    
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['is_on_duty']
+    
     def get_queryset(self):
-        queryset = SupportEngineer.objects.select_related('user')
-        if self.request.user.role != 'admin':
-            queryset = queryset.filter(user=self.request.user)
-        return queryset
+        # Добавляем annotate, чтобы БД сама посчитала тикеты одним запросом!
+        queryset = SupportEngineer.objects.select_related('user').annotate(
+            annotated_resolved_count=Count(
+                'assigned_tickets',
+                filter=Q(assigned_tickets__status__in=['RS', 'CL'])
+            )
+        ).order_by('-is_on_duty', 'id')
+
+        user = self.request.user
+
+        if user.role == 'admin':
+            return queryset
+        elif user.role == 'engineer':
+            return queryset
+        else:
+            return queryset.none()
 
     def perform_create(self, serializer):
         raise serializers.ValidationError(
-            "Профиль инженера создаётся автоматически при создании пользователя с ролью engineer")
+            "Профиль инженера создаётся автоматически при создании пользователя с ролью engineer"
+        )
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrEngineerSelf])
+    # ✅ Явно указываем пермишены для кастомного экшена
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAdminOrEngineerSelf])
     def toggle_duty(self, request, pk=None):
         """Переключить статус дежурства инженера"""
-        engineer = self.get_object()
+        
+        # 🛡️ При вызове get_object() DRF автоматически прогонит IsAdminOrEngineerSelf.has_object_permission
+        engineer = self.get_object() 
+        
+        # Ручная проверка больше не нужна! Код стал максимально чистым.
         engineer.is_on_duty = not engineer.is_on_duty
         engineer.save(update_fields=['is_on_duty', 'updated_at'])
+        
         return Response({
             'is_on_duty': engineer.is_on_duty,
-            'message': f"Инженер {'на' if engineer.is_on_duty else 'не'} дежурстве"
+            'message': f"Инженер {'на дежурстве' if engineer.is_on_duty else 'снят с дежурства'}"
         })
 
-    @action(detail=False, methods=['get'], permission_classes=[IsAdminOrEngineerSelf])
+    @action(detail=False, methods=['get'])
     def on_duty(self, request):
-        """Список инженеров, находящихся сейчас на дежурстве"""
+        """Инженеры, находящиеся сейчас на дежурстве"""
         engineers = SupportEngineer.objects.filter(
             is_on_duty=True,
             user__is_active=True
         ).select_related('user')
 
-        # Дополнительно можно отфильтровать по активной смене
-        from django.utils import timezone
         now = timezone.localtime(timezone.now())
         engineers = engineers.filter(
             shifts__shift_date=now.date(),
@@ -181,5 +238,11 @@ class SupportEngineerProfileViewSet(viewsets.ModelViewSet):
             shifts__shift_end__gte=now.time()
         ).distinct()
 
+        page = self.paginate_queryset(engineers)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
         serializer = self.get_serializer(engineers, many=True)
         return Response(serializer.data)
+        

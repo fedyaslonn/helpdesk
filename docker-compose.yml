@@ -6,6 +6,7 @@ services:
     container_name: hd_app
     restart: unless-stopped
     volumes:
+      - .:/help_desk
       - app_data:/app_data
     ports:
       - "8000:8000"

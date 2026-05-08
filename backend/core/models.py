@@ -6,6 +6,7 @@ from django.core.validators import MinLengthValidator, MinValueValidator, MaxVal
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.db.models import Count, Q
 
 
 class TimestampedModel(models.Model):
@@ -335,6 +336,11 @@ class Comment(TimestampedModel):
     ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name="comments", verbose_name=_("Заявка"))
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="comments", verbose_name=_("Автор"))
     content = models.TextField(validators=[MinLengthValidator(2)], verbose_name=_("Текст комментария"))
+
+    parent = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.CASCADE, 
+        related_name="replies", verbose_name="Родительский комментарий"
+    )
 
     class Meta:
         verbose_name = _("Комментарий")

@@ -1,321 +1,397 @@
-import React, { useState, useEffect } from 'react'
-import { useAuth } from '../auth/AuthContext'
-import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import '../styles/TicketsPage.css'
-import '../styles/Filters.css'
-import { getTickets, getCurrentUser } from '../services/ticket-management-api'
-import { serverApi } from "../contants"
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../auth/AuthContext';
+import { Link, useSearchParams } from 'react-router-dom';
+import { getTickets, getCategories, createTicket } from '../services/ticket-management-api';
 
+import {
+  Container,
+  Box,
+  Typography,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  MenuItem,
+  CircularProgress,
+  Alert,
+  Tabs,
+  Tab,
+  Card,
+  CardContent,
+  CardActions,
+  Chip,
+  Stack,
+  Badge
+} from '@mui/material';
 
-const TicketsPage = () => {
-  const { user: contextUser, isAuthenticated } = useAuth()
-  const [tickets, setTickets] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
-  const [userData, setUserData] = useState(null)
+// ==========================================
+// КОМПОНЕНТ МОДАЛЬНОГО ОКНА ДЛЯ СОЗДАНИЯ ЗАЯВКИ
+// ==========================================
+const CreateTicketModal = ({ isOpen, onClose, onSuccess }) => {
+  const { user } = useAuth();
+  const [categories, setCategories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
-  const initialStatusFilter = searchParams.get('status') || null
-  const initialAssigneeFilter = searchParams.get('assignee') || null
-
-  const [statusFilter, setStatusFilter] = useState(initialStatusFilter)
-  const [assigneeFilter, setAssigneeFilter] = useState(initialAssigneeFilter)
-
-  const clearFilters = () => {
-    setStatusFilter(null)
-    setAssigneeFilter(null)
-    setSearchParams({})
-  }
+  const [formData, setFormData] = useState({
+    description: '',
+    category: '',
+  });
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!isAuthenticated) return
+    if (!isOpen) return;
 
+    const fetchCategories = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
-        setIsLoading(true)
-       const params = {
-         status: statusFilter,
-       };
+        const response = await getCategories();
+        const cats = response.data.results || response.data;
+        setCategories(cats);
 
-      if (assigneeFilter) {
-        params.assignee = assigneeFilter;
-      }
-
-        const token = localStorage.getItem('token')
-        console.log("Current token:", token)
-        console.log("Is authenticated:", isAuthenticated)
-
-        const [userResponse, ticketsResponse] = await Promise.all([
-          getCurrentUser(),
-          getTickets(params)
-        ]);
-
-        setUserData(userResponse.data)
-        setTickets(ticketsResponse.data)
-
-        console.log("User data loaded:", userResponse.data)
-        console.log("Tickets loaded:", ticketsResponse.data)
-      } catch (err) {
-        console.error('Error loading data:', err)
-        if (err.response) {
-          console.error("Response status:", err.response.status)
-          console.error("Response data:", err.response.data)
-
-          if (err.response.status === 401) {
-            setError('Session expired. Please login again.')
-            localStorage.removeItem('token')
-            navigate('/login');
-          } else {
-            setError('Failed to load data')
-          }
-        } else {
-          setError('Network error')
+        if (cats.length > 0) {
+          setFormData({ description: '', category: cats[0].id.toString() });
         }
+      } catch (err) {
+        setError('Не удалось загрузить категории');
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
+    };
+
+    fetchCategories();
+  }, [isOpen]);
+
+  const handleChange = (e) => {
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.category) {
+      setError('Необходимо выбрать категорию');
+      return;
     }
 
-    fetchData();
-  }, [isAuthenticated, statusFilter, assigneeFilter, navigate])
-
-  const currentUser = userData || contextUser
-
-  const myRequests = tickets.filter(ticket =>
-    ticket.requestor && currentUser && ticket.requestor.id === currentUser.id
-  )
-
-  const organizationTickets = tickets.filter(ticket => {
-    if (!ticket.organization || !currentUser?.organization) return false
-
-    const ticketOrgId = Number(ticket.organization.id)
-    const userOrgId = Number(currentUser.organization.id)
-
-    return ticketOrgId === userOrgId
-  }).filter(ticket =>
-    !(ticket.requestor && currentUser && ticket.requestor.id === currentUser.id)
-  )
-
-  const assignedToMe = tickets.filter(ticket =>
-    ticket.assignee && currentUser && ticket.assignee.id === currentUser.id
-  ).filter(ticket =>
-
-    !(ticket.requestor && currentUser && ticket.requestor.id === currentUser.id)
-  )
-
-  const groupedTickets = {
-    MY_REQUESTS: myRequests,
-    ORGANIZATION: organizationTickets,
-    ASSIGNED_TO_ME: assignedToMe
-  }
-
-  console.log("Current user:", currentUser)
-  console.log("Organization tickets count:", organizationTickets.length)
-
-  const renderTicketCard = (ticket) => (
-    <div key={ticket.id} className="ticket-card">
-      <div className="ticket-header">
-        <span className={`ticket-status ${ticket.status.toLowerCase()}`}>
-          {ticket.status === 'OP' && 'Open'}
-          {ticket.status === 'IP' && 'In Progress'}
-          {ticket.status === 'WR' && 'Waiting'}
-          {ticket.status === 'RS' && 'Resolved'}
-        </span>
-      </div>
-      <h3 className="ticket-title">{ticket.title}</h3>
-      <p className="ticket-description">
-        {ticket.description.length > 100 ?
-          `${ticket.description.substring(0, 100)}...`
-          : ticket.description}
-      </p>
-      <div className="ticket-meta">
-        <div className="ticket-users">
-          <div className="ticket-user">
-            <span className="label">From:</span>
-            <span className="value">{ticket.requestor.username}</span>
-          </div>
-          <div className="ticket-user">
-            <span className="label">Assignee:</span>
-            <span className="value">
-              {ticket.assignee ? ticket.assignee.username : 'Unassigned'}
-            </span>
-          </div>
-        </div>
-        <div className="ticket-date">
-          Created: {new Date(ticket.created_at).toLocaleDateString()}
-        </div>
-      </div>
-      <div className="ticket-footer">
-        <Link to={`/helpdesk/tickets/${ticket.id}`} className="btn btn-primary btn-sm">
-          View Details
-        </Link>
-      </div>
-    </div>
-  )
-
-  const renderTicketSection = (title, tickets) => (
-    <div className="ticket-section">
-      <h2 className="section-title">
-        {title} <span className="ticket-count">({tickets.length})</span>
-      </h2>
-      <div className="tickets-list">
-        {tickets.length > 0 ? (
-          tickets.map(renderTicketCard)
-        ) : (
-          <p className="no-tickets">No tickets in this category</p>
-        )}
-      </div>
-    </div>
-  )
-
-  if (isLoading) {
-    return (
-      <div className="app-container">
-        <main className="main-content">
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
-        </main>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="app-container">
-        <main className="main-content">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-            <strong className="font-bold">Error! </strong>
-            <span className="block sm:inline">{error}</span>
-          </div>
-        </main>
-      </div>
-    )
-  }
+    setIsSubmitting(true);
+    try {
+      const ticketData = {
+        description: formData.description,
+        category: parseInt(formData.category),
+        user: user.id
+      };
+      
+      await createTicket(ticketData);
+      onSuccess(); 
+      onClose();   
+    } catch (err) {
+      setError('Ошибка при создании заявки');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <main className="main-content">
-      <div className="filters-section">
-        <div className="filters-header">
-          <div className="filters-title">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="filters-title-icon"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              width="16"
-              height="16"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-              />
-            </svg>
-            <span>Filters</span>
-            {(statusFilter || assigneeFilter) && (
-              <span className="active-filters-badge">{[statusFilter, assigneeFilter].filter(Boolean).length}</span>
-            )}
-          </div>
-          {(statusFilter || assigneeFilter) && (
-            <button className="clear-filters-btn" onClick={clearFilters}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Clear all
-            </button>
-          )}
-        </div>
-
-        <div className="filter-group">
-          <label className="filter-group-label">Status</label>
-          <div className="filter-buttons-container">
-            {['OP', 'IP', 'RS', 'WR'].map((status) => (
-              <button
-                key={status}
-                className={`filter-btn status-${status.toLowerCase()} ${statusFilter === status ? 'selected' : ''}`}
-                onClick={() => {
-                  const newStatus = statusFilter === status ? null : status;
-                  setStatusFilter(newStatus);
-                  setSearchParams((prev) => {
-                    const newParams = new URLSearchParams(prev);
-                    if (newStatus) newParams.set('status', newStatus);
-                    else newParams.delete('status');
-                    return newParams;
-                  });
-                }}
+    <Dialog open={isOpen} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle sx={{ fontWeight: 'bold', color: '#1e293b' }}>
+        Создать новую заявку
+      </DialogTitle>
+      
+      <Box component="form" onSubmit={handleSubmit}>
+        <DialogContent dividers>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          
+          {isLoading ? (
+            <Box display="flex" justifyContent="center" p={3}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Stack spacing={3} sx={{ mt: 1 }}>
+              <TextField
+                select
+                label="Категория проблемы"
+                name="category"
+                value={formData.category}
+                onChange={handleChange}
+                required
+                fullWidth
               >
-                {status === 'OP' && 'Open'}
-                {status === 'IP' && 'In Progress'}
-                {status === 'RS' && 'Resolved'}
-                {status === 'WR' && 'Waiting'}
-              </button>
-            ))}
-          </div>
-        </div>
+                {categories.map((cat) => (
+                  <MenuItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </MenuItem>
+                ))}
+              </TextField>
 
-        <div className="filter-group">
-          <label className="filter-group-label">Assignee</label>
-          <div className="filter-buttons-container">
-                  <button
-      key="unassigned"
-      className={`filter-btn assignee ${assigneeFilter === 'unassigned' ? 'selected' : ''}`}
-      onClick={() => {
-        const newAssignee = assigneeFilter === 'unassigned' ? null : 'unassigned';
-        setAssigneeFilter(newAssignee)
-        setSearchParams((prev) => {
-          const newParams = new URLSearchParams(prev)
-          if (newAssignee) newParams.set('assignee', 'unassigned')
-          else newParams.delete('assignee')
-          return newParams
-        })
-      }}
-    >
-      Unassigned
-    </button>
-            {Array.from(new Set(tickets.map((t) => t.assignee?.username).filter(Boolean)))
-              .slice(0, 5)
-              .map((username) => (
-                <button
-                  key={username}
-                  className={`filter-btn assignee ${assigneeFilter === username ? 'selected' : ''}`}
-                  onClick={() => {
-                    const newAssignee = assigneeFilter === username ? null : username;
-                    setAssigneeFilter(newAssignee)
-                    setSearchParams((prev) => {
-                      const newParams = new URLSearchParams(prev)
-                      if (newAssignee) newParams.set('assignee', newAssignee)
-                      else newParams.delete('assignee')
-                      return newParams
-                    })
-                  }}
-                >
-                  {username}
-                </button>
-              ))}
-          </div>
-        </div>
-      </div>
+              <TextField
+                label="Описание проблемы"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                placeholder="Подробно опишите суть проблемы..."
+                multiline
+                rows={5}
+                required
+                fullWidth
+              />
+            </Stack>
+          )}
+        </DialogContent>
+        
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={onClose} disabled={isSubmitting} color="inherit">
+            Отмена
+          </Button>
+          <Button 
+            type="submit" 
+            variant="contained" 
+            color="primary" 
+            disabled={isSubmitting}
+            sx={{ boxShadow: 2 }}
+          >
+            {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Создать заявку'}
+          </Button>
+        </DialogActions>
+      </Box>
+    </Dialog>
+  );
+};
 
-      <div className="page-header">
-        <h2>My Tickets</h2>
-        <div className="flex items-center gap-2">
-          <button className="btn btn-primary" onClick={() => navigate('/helpdesk/tickets/create')}>
-            + New Ticket
-          </button>
-        </div>
-      </div>
 
-      <div className="tickets-grid">
-        {renderTicketSection("My Requests", groupedTickets.MY_REQUESTS)}
-        {renderTicketSection("Organization Tickets", groupedTickets.ORGANIZATION)}
-        {renderTicketSection("Assigned to Me", groupedTickets.ASSIGNED_TO_ME)}
-      </div>
-    </main>
-  )
-}
+// ==========================================
+// ОСНОВНАЯ СТРАНИЦА ЗАЯВОК
+// ==========================================
+const STATUSES = [
+  { value: 'ALL', label: 'Все заявки', icon: '📋' },
+  { value: 'OP', label: 'Открыты', icon: '🔴', color: 'error' },
+  { value: 'IP', label: 'В работе', icon: '🟡', color: 'warning' },
+  { value: 'WR', label: 'Ожидание', icon: '🔵', color: 'info' },
+  { value: 'RS', label: 'Решены', icon: '🟢', color: 'success' },
+  { value: 'CL', label: 'Закрыты', icon: '⚫', color: 'default' }
+];
 
-export default TicketsPage
+const getStatusConfig = (statusCode) => {
+  return STATUSES.find(s => s.value === statusCode) || { label: statusCode, color: 'default' };
+};
+
+// 🔥 Стили для контейнера с горизонтальным скроллом
+const horizontalScrollStyles = {
+  display: 'flex',
+  flexDirection: 'row',
+  overflowX: 'auto',
+  gap: 3, // Расстояние между карточками
+  pb: 2, // Отступ снизу для скроллбара
+  pt: 1, // Отступ сверху для тени
+  px: 1, // Отступ по бокам, чтобы тень первой карточки не обрезалась
+  '&::-webkit-scrollbar': {
+    height: '8px',
+  },
+  '&::-webkit-scrollbar-track': {
+    backgroundColor: '#f1f5f9',
+    borderRadius: '4px',
+  },
+  '&::-webkit-scrollbar-thumb': {
+    backgroundColor: '#cbd5e1',
+    borderRadius: '4px',
+    '&:hover': {
+      backgroundColor: '#94a3b8',
+    }
+  }
+};
+
+const TicketsPage = () => {
+  const { user: currentUser, isAuthenticated } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  const [tickets, setTickets] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const currentTab = searchParams.get('status') || 'ALL';
+
+  const fetchTickets = async () => {
+    setIsLoading(true);
+    try {
+      const params = currentTab !== 'ALL' ? { status: currentTab } : {};
+      const response = await getTickets(params);
+      setTickets(response.data.results || response.data);
+    } catch (err) {
+      setError('Не удалось загрузить заявки');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchTickets();
+    }
+  }, [isAuthenticated, currentTab]);
+
+  const handleTabChange = (event, newValue) => {
+    if (newValue === 'ALL') {
+      setSearchParams({});
+    } else {
+      setSearchParams({ status: newValue });
+    }
+  };
+
+  const myRequests = tickets.filter(ticket => ticket.user === currentUser?.id || ticket.user?.id === currentUser?.id);
+  
+  const assignedToMe = tickets.filter(ticket => 
+    ticket.assigned_engineer && 
+    (ticket.assigned_engineer === currentUser?.id || ticket.assigned_engineer?.user === currentUser?.id)
+  );
+
+  const renderTicketCard = (ticket) => {
+    const statusConfig = getStatusConfig(ticket.status);
+    
+    return (
+      <Card 
+        key={ticket.id} 
+        sx={{ 
+          // 🔥 Фиксируем ширину карточки и запрещаем ей сжиматься
+          minWidth: 320, 
+          width: 320, 
+          flexShrink: 0, 
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: 1, 
+          transition: '0.2s', 
+          '&:hover': { boxShadow: 4 } 
+        }}
+      >
+        <CardContent sx={{ pb: 1, flexGrow: 1 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+            <Chip label={statusConfig.label} color={statusConfig.color} size="small" sx={{ fontWeight: 'bold' }} />
+            <Typography variant="caption" color="text.secondary" fontWeight="bold">
+              {ticket.ticket_number}
+            </Typography>
+          </Box>
+          
+          <Typography variant="h6" sx={{ fontSize: '1.05rem', mb: 2, color: '#0f172a', lineHeight: 1.3 }}>
+            {ticket.description.length > 70 ? `${ticket.description.substring(0, 70)}...` : ticket.description}
+          </Typography>
+          
+          <Stack direction="row" spacing={2} justifyContent="space-between">
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">Категория:</Typography>
+              <Typography variant="body2" fontWeight="medium" noWrap sx={{ maxWidth: 140 }}>
+                {ticket.category?.name || ticket.category || 'Без категории'}
+              </Typography>
+            </Box>
+            <Box textAlign="right">
+              <Typography variant="caption" color="text.secondary" display="block">Дедлайн:</Typography>
+              <Typography variant="body2" fontWeight="medium" color={ticket.sla_deadline ? 'text.primary' : 'text.secondary'}>
+                {ticket.sla_deadline ? new Date(ticket.sla_deadline).toLocaleDateString() : '—'}
+              </Typography>
+            </Box>
+          </Stack>
+        </CardContent>
+        
+        <CardActions sx={{ px: 2, pb: 2, pt: 0 }}>
+          <Button component={Link} to={`/helpdesk/tickets/${ticket.id}`} variant="outlined" size="small" color="primary" fullWidth>
+            Подробнее
+          </Button>
+        </CardActions>
+      </Card>
+    );
+  };
+
+  if (isLoading && tickets.length === 0) {
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" mt={10}>
+        <CircularProgress size={50} color="primary" />
+        <Typography mt={2} color="text.secondary">Загрузка заявок...</Typography>
+      </Box>
+    );
+  }
+  
+  if (error) return <Alert severity="error" sx={{ m: 4 }}>{error}</Alert>;
+
+  return (
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 8 }}>
+      <CreateTicketModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={fetchTickets} />
+
+      {/* Заголовок и кнопка создания */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+        <Typography variant="h4" fontWeight="bold" color="#1e293b">
+          Заявки
+        </Typography>
+        <Button variant="contained" color="primary" onClick={() => setIsModalOpen(true)} sx={{ boxShadow: 2, px: 3 }}>
+          + Новая заявка
+        </Button>
+      </Box>
+
+      {/* Панель фильтров (Tabs) */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
+        <Tabs 
+          value={currentTab} 
+          onChange={handleTabChange} 
+          variant="scrollable"
+          scrollButtons="auto"
+          textColor="primary"
+          indicatorColor="primary"
+        >
+          {STATUSES.map(status => (
+            <Tab 
+              key={status.value} 
+              value={status.value} 
+              label={<Box display="flex" alignItems="center" gap={1}><span>{status.icon}</span> {status.label}</Box>} 
+              sx={{ textTransform: 'none', fontWeight: 'medium', fontSize: '0.95rem' }}
+            />
+          ))}
+        </Tabs>
+      </Box>
+
+      {/* СЕКЦИЯ 1: Мои обращения */}
+      <Box mb={5}>
+        <Box display="flex" alignItems="center" gap={2} mb={2}>
+          <Typography variant="h5" fontWeight="bold" color="#334155">
+            Мои обращения
+          </Typography>
+          <Badge badgeContent={myRequests.length} color="primary" sx={{ ml: 1 }} />
+        </Box>
+        
+        {myRequests.length > 0 ? (
+          <Box sx={horizontalScrollStyles}>
+            {myRequests.map(renderTicketCard)}
+          </Box>
+        ) : (
+          <Typography color="text.secondary" sx={{ bgcolor: '#f1f5f9', p: 3, borderRadius: 2, maxWidth: 400 }}>
+            У вас пока нет созданных заявок.
+          </Typography>
+        )}
+      </Box>
+
+      {/* СЕКЦИЯ 2: В моей работе (Под первой секцией) */}
+      {currentUser?.role !== 'client' && (
+        <Box mb={5}>
+          <Box display="flex" alignItems="center" gap={2} mb={2}>
+            <Typography variant="h5" fontWeight="bold" color="#334155">
+              В моей работе
+            </Typography>
+            <Badge badgeContent={assignedToMe.length} color="secondary" sx={{ ml: 1 }} />
+          </Box>
+          
+          {assignedToMe.length > 0 ? (
+            <Box sx={horizontalScrollStyles}>
+              {assignedToMe.map(renderTicketCard)}
+            </Box>
+          ) : (
+            <Typography color="text.secondary" sx={{ bgcolor: '#f1f5f9', p: 3, borderRadius: 2, maxWidth: 400 }}>
+              У вас пока нет назначенных заявок.
+            </Typography>
+          )}
+        </Box>
+      )}
+
+    </Container>
+  );
+};
+
+export default TicketsPage;

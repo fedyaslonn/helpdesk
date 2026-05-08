@@ -36,13 +36,14 @@ class SupportEngineerProfileSerializer(serializers.ModelSerializer):
     contact_phone = serializers.CharField(source='user.contact_phone', required=False)
     is_on_duty = serializers.BooleanField(required=False)
     is_active_on_shift = serializers.SerializerMethodField()
+    resolved_tickets_count = serializers.SerializerMethodField()
 
     class Meta:
         model = SupportEngineer
         fields = [
             'id', 'user_id', 'username', 'email', 'full_name', 'contact_phone',
             'max_concurrent_tickets', 'is_on_duty', 'is_active_on_shift',
-            'last_ticket_resolved_at', 'created_at', 'updated_at'
+            'last_ticket_resolved_at', 'created_at', 'updated_at', 'resolved_tickets_count',
         ]
         read_only_fields = [
             'id', 'user_id', 'username', 'email', 'last_ticket_resolved_at',
@@ -57,6 +58,13 @@ class SupportEngineerProfileSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Максимальное количество заявок должно быть от 1 до 20")
         return value
 
+    def get_resolved_tickets_count(self, obj):
+        # 1. Если ViewSet заранее посчитал это поле через annotate, берем его (быстро!)
+        if hasattr(obj, 'annotated_resolved_count'):
+            return obj.annotated_resolved_count
+            
+        # 2. Фолбэк: если запрашиваем без ViewSet (например, при сохранении), считаем запросом
+        return obj.assigned_tickets.filter(status__in=['RS', 'CL']).count()
 
 class UserListSerializer(serializers.ModelSerializer):
     """Минимальный сериализатор для списка пользователей (админ-панель)"""
