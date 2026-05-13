@@ -22,8 +22,8 @@ const Header = () => {
 
   // Состояния для управления открытием выпадающих меню
   const [anchorElTickets, setAnchorElTickets] = useState(null);
-  const [anchorElKB, setAnchorElKB] = useState(null);           // 👈 Новое состояние для БЗ
-  const [anchorElShifts, setAnchorElShifts] = useState(null);   // 👈 Новое состояние для Смен
+  const [anchorElKB, setAnchorElKB] = useState(null);           
+  const [anchorElShifts, setAnchorElShifts] = useState(null);   
   const [anchorElUsers, setAnchorElUsers] = useState(null);
   const [anchorElDicts, setAnchorElDicts] = useState(null);
   const [anchorElProfile, setAnchorElProfile] = useState(null);
@@ -106,7 +106,7 @@ const Header = () => {
             ]}
           </Menu>
 
-          {/* 2. БАЗА ЗНАНИЙ (Расширенная) */}
+          {/* 2. БАЗА ЗНАНИЙ */}
           <Button 
             color="inherit" 
             onClick={(e) => setAnchorElKB(e.currentTarget)}
@@ -115,18 +115,17 @@ const Header = () => {
             База знаний ▾
           </Button>
           <Menu anchorEl={anchorElKB} open={Boolean(anchorElKB)} onClose={closeAllMenus} disableScrollLock>
-            <MenuItem component={RouterLink} to="/helpdesk/kb" onClick={closeAllMenus}>
+            <MenuItem component={RouterLink} to="/helpdesk/kb-articles" onClick={closeAllMenus}>
               Все статьи
             </MenuItem>
-            {/* Добавлять статьи могут только инженеры и админы */}
             {(isAdmin || isEngineer) && (
-              <MenuItem component={RouterLink} to="/helpdesk/kb/create" onClick={closeAllMenus}>
+              <MenuItem component={RouterLink} to="/helpdesk/kb-articles/create" onClick={closeAllMenus}>
                 Добавить статью
               </MenuItem>
             )}
           </Menu>
 
-          {/* 3. РАСПИСАНИЕ СМЕН (Расширенное) */}
+          {/* 3. РАСПИСАНИЕ СМЕН */}
           {(isAdmin || isEngineer) && (
             <>
               <Button 
@@ -146,7 +145,6 @@ const Header = () => {
                     Мой график
                   </MenuItem>
                 )}
-                {/* Общий пункт для всех сотрудников */}
                 <MenuItem component={RouterLink} to="/helpdesk/shift-management" onClick={closeAllMenus}>
                   Кто сегодня дежурит?
                 </MenuItem>
@@ -167,7 +165,7 @@ const Header = () => {
             </>
           )}
 
-          {/* 5. СПРАВОЧНИКИ */}
+          {/* 5. СПРАВОЧНИКИ И МЕТРИКИ */}
           {isAdmin && (
             <>
               <Button color="inherit" onClick={(e) => setAnchorElDicts(e.currentTarget)} sx={{ textTransform: 'none', fontSize: '15px' }}>
@@ -176,7 +174,20 @@ const Header = () => {
               <Menu anchorEl={anchorElDicts} open={Boolean(anchorElDicts)} onClose={closeAllMenus} disableScrollLock>
                 <MenuItem component={RouterLink} to="/helpdesk/categories" onClick={closeAllMenus}>Категории</MenuItem>
                 <MenuItem component={RouterLink} to="/helpdesk/priorities" onClick={closeAllMenus}>Приоритеты</MenuItem>
-                <MenuItem component={RouterLink} to="/helpdesk/sla-rules" onClick={closeAllMenus}>Правила SLA</MenuItem>
+                <MenuItem component={RouterLink} to="/helpdesk/classification-rules" onClick={closeAllMenus}>
+                  Правила авто-классификации
+                </MenuItem>
+                
+                {/* 🔥 ДОБАВЛЕННЫЙ БЛОК ДЛЯ МЕТРИК */}
+                <Divider sx={{ my: 1 }} />
+                <MenuItem 
+  component={RouterLink} 
+  to="/helpdesk/api/metrics" 
+  onClick={closeAllMenus}
+  sx={{ color: 'primary.main', fontWeight: 'bold' }}
+>
+  📊 Системные метрики
+</MenuItem>
               </Menu>
             </>
           )}

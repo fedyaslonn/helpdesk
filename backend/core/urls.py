@@ -13,6 +13,9 @@ from core.views.sla import SLAParameterViewSet
 from core.views.notifications import NotificationViewSet
 from core.views.shifts import ShiftScheduleViewSet
 from core.views.priorities import PriorityViewSet
+from core.views.classification_rules import TicketClassificationRuleViewSet
+from core.views.kb_suggest import KBSuggestView
+from core.views.prometheus_metrics import prometheus_metrics_view
 
 
 
@@ -40,8 +43,15 @@ router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'sla-rules', SLAParameterViewSet, basename='sla-rule')
 router.register(r'shifts', ShiftScheduleViewSet, basename='shift')
 router.register(r'priorities', PriorityViewSet, basename='priority')
+router.register(r'classification-rules', TicketClassificationRuleViewSet, basename='classification-rule')
 
 urlpatterns = router.urls
+
+# Синхронные KB подсказки для тикета
+urlpatterns += [
+    path("kb/suggest/", KBSuggestView.as_view(), name="kb-suggest"),
+    path('api/metrics/', prometheus_metrics_view, name='metrics'),
+]
 
 # from core.views.applications import ApplicationsViewSet
 # from core.views.comments import CommentsViewSet

@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 15s # Как часто забирать метрики
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'helpdesk_backend'
+    # ВАЖНО: Путь, который мы видели в твоих логах
+    metrics_path: '/helpdesk/api/metrics/' 
+    
+    # Тот самый токен из твоего views.py!
+    bearer_token: 'secret-scrape-token'
+    
+    static_configs:
+      # Замени 'hd_app:8000' на имя твоего контейнера с Django
+      # Если он называется backend, пиши 'backend:8000'
+      - targets: ['hdapp:8000']
+      

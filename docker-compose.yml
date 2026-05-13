@@ -17,8 +17,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mongo:
+        condition: service_started
+      ollama:
+        condition: service_started
     networks:
-      - app_network
+      app_network:
+        aliases:
+          - hdapp  # 🔥 Тот самый легальный хост для Prometheus (без подчеркиваний)
 
   frontend:
     build:
@@ -53,6 +59,7 @@ services:
       - app_network
     volumes:
       - postgres_data:/var/lib/postgresql
+
   celery_worker:
     build: .
     restart: unless-stopped
@@ -67,6 +74,7 @@ services:
         condition: service_healthy
     networks:
       - app_network
+
   redis:
     image: redis:latest
     container_name: redis
@@ -82,10 +90,82 @@ services:
       - app_network
     command: ["redis-server"]
 
+  mongo:
+    image: mongo:7
+    container_name: mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    networks:
+      - app_network
+    volumes:
+      - mongo_data:/data/db
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    networks:
+      - app_network
+    volumes:
+      - ollama_data:/root/.ollama
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    networks:
+      - app_network
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+  # ==========================================
+  # 🔥 БЛОК МОНИТОРИНГА (Prometheus + Grafana)
+  # ==========================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml # Файл настроек (должен лежать рядом с docker-compose)
+      - prometheus_data:/prometheus                       # Чтобы история метрик не удалялась
+    ports:
+      - "9090:9090"
+    networks:
+      - app_network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana                     # Чтобы дашборды и пароли не удалялись
+    depends_on:
+      - prometheus
+    networks:
+      - app_network
+
 volumes:
   app_data:
   postgres_data:
+  mongo_data:
+  ollama_data:
+  es_data:
+  prometheus_data: # 🔥 Добавили том для метрик
+  grafana_data:    # 🔥 Добавили том для дашбордов
 
 networks:
   app_network:
     driver: bridge
+    

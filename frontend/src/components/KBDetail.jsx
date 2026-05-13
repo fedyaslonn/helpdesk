@@ -3,6 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { getKBArticleDetails, deleteKBArticle, voteKBArticle } from '../services/ticket-management-api';
 
+import {
+  Container,
+  Box,
+  Typography,
+  Button,
+  Paper,
+  CircularProgress,
+  Chip,
+  Stack,
+  Divider
+} from '@mui/material';
+
 const KBDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -10,27 +22,33 @@ const KBDetail = () => {
   
   const [article, setArticle] = useState(null);
   const [voted, setVoted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadArticle = async () => {
+      setIsLoading(true);
       try {
         const response = await getKBArticleDetails(id);
         setArticle(response.data);
       } catch (err) {
         alert("Статья не найдена");
-        navigate('/helpdesk/kb');
+        // 🔥 Исправлен путь на kb-articles
+        navigate('/helpdesk/kb-articles');
+      } finally {
+        setIsLoading(false);
       }
     };
     loadArticle();
   }, [id, navigate]);
 
   const handleDelete = async () => {
-    if (!window.confirm("Удалить статью?")) return;
+    if (!window.confirm("Вы уверены, что хотите удалить эту статью навсегда?")) return;
     try {
       await deleteKBArticle(id);
-      navigate('/helpdesk/kb');
+      // 🔥 Исправлен путь на kb-articles
+      navigate('/helpdesk/kb-articles');
     } catch (err) {
-      alert("Ошибка удаления");
+      alert("Ошибка при удалении статьи");
     }
   };
 
@@ -41,59 +59,116 @@ const KBDetail = () => {
       setArticle(prev => ({ ...prev, helpful_count: response.data.helpful_count }));
       setVoted(true);
     } catch (err) {
-      alert("Ошибка голосования");
+      alert("Ошибка при сохранении оценки");
     }
   };
 
-  if (!article) return <div className="spinner" style={{margin: '50px auto'}}></div>;
+  if (isLoading) {
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" mt={10}>
+        <CircularProgress color="primary" />
+        <Typography mt={2} color="text.secondary">Загрузка статьи...</Typography>
+      </Box>
+    );
+  }
+
+  if (!article) return null;
 
   const canEdit = user?.role === 'admin' || user?.id === article.author;
 
   return (
-    <div style={{ maxWidth: '800px', margin: '30px auto', background: '#fff', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-      <button className="btn btn-secondary btn-sm" style={{ marginBottom: '20px' }} onClick={() => navigate('/helpdesk/kb')}>← К списку статей</button>
-      
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <h1 style={{ marginTop: 0, color: '#0f172a' }}>{article.title}</h1>
-        {canEdit && (
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="btn btn-danger btn-sm" onClick={handleDelete}>Удалить</button>
-          </div>
-        )}
-      </div>
+    <Container maxWidth="md" sx={{ mt: 6, mb: 8 }}>
+      <Button 
+        variant="outlined" 
+        color="inherit" 
+        size="small" 
+        onClick={() => navigate('/helpdesk/kb-articles')}
+        sx={{ mb: 4 }}
+      >
+        Назад к списку
+      </Button>
 
-      <div style={{ display: 'flex', gap: '20px', fontSize: '14px', color: '#64748b', marginBottom: '30px', paddingBottom: '20px', borderBottom: '1px solid #e2e8f0' }}>
-        <span>Автор: {article.author_name}</span>
-        <span>Опубликовано: {new Date(article.created_at).toLocaleDateString()}</span>
-        <span>Просмотров: {article.view_count}</span>
-        {!article.is_published && <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>Скрытый черновик</span>}
-      </div>
+      <Paper elevation={0} sx={{ p: { xs: 3, md: 5 }, border: '1px solid #e2e8f0', borderRadius: 3 }}>
+        
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3} flexWrap="wrap" gap={2}>
+          <Typography variant="h4" fontWeight="bold" color="#0f172a" sx={{ flex: 1, minWidth: '300px' }}>
+            {article.title}
+          </Typography>
+          {canEdit && (
+            <Button variant="outlined" color="error" size="small" onClick={handleDelete}>
+              Удалить статью
+            </Button>
+          )}
+        </Box>
 
-      <div style={{ fontSize: '16px', lineHeight: '1.8', color: '#334155', whiteSpace: 'pre-wrap', marginBottom: '40px' }}>
-        {article.content}
-      </div>
+        <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mb: 4, pb: 3, borderBottom: '1px solid #e2e8f0' }}>
+          <Chip label={`Автор: ${article.author_name || 'Неизвестен'}`} size="small" variant="outlined" />
+          <Chip label={`Опубликовано: ${new Date(article.created_at).toLocaleDateString('ru-RU')}`} size="small" variant="outlined" />
+          <Chip label={`Просмотров: ${article.view_count}`} size="small" variant="outlined" />
+          {!article.is_published && (
+            <Chip label="Скрытый черновик" size="small" color="warning" sx={{ fontWeight: 'bold' }} />
+          )}
+        </Stack>
 
-      {article.tags && (
-        <div style={{ marginBottom: '30px' }}>
-          <strong>Теги: </strong> 
-          {article.tags.split(',').map(t => (
-            <span key={t} style={{ background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', marginRight: '5px', fontSize: '13px' }}>#{t.trim()}</span>
-          ))}
-        </div>
-      )}
-
-      {/* Голосование */}
-      <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', textAlign: 'center' }}>
-        <h3 style={{ marginTop: 0, color: '#0f172a' }}>Статья была полезна?</h3>
-        <button 
-          onClick={handleVote} 
-          disabled={voted}
-          style={{ background: voted ? '#10b981' : '#fff', color: voted ? '#fff' : '#10b981', border: '2px solid #10b981', padding: '10px 20px', borderRadius: '6px', fontSize: '16px', cursor: voted ? 'default' : 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
+        <Typography 
+          variant="body1" 
+          sx={{ 
+            fontSize: '1.1rem', 
+            lineHeight: 1.8, 
+            color: '#334155', 
+            whiteSpace: 'pre-wrap', 
+            mb: 5 
+          }}
         >
-          {voted ? `✓ Спасибо за оценку! (${article.helpful_count})` : `👍 Да, помогло (${article.helpful_count})`}
-        </button>
-      </div>
-    </div>
+          {article.content}
+        </Typography>
+
+        {article.tags && (
+          <Box mb={5}>
+            <Typography variant="subtitle2" fontWeight="bold" color="text.secondary" mb={1.5} textTransform="uppercase">
+              Теги
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              {article.tags.split(',').map(t => (
+                <Chip 
+                  key={t} 
+                  label={`#${t.trim()}`} 
+                  size="small" 
+                  sx={{ bgcolor: '#f1f5f9', color: '#475569', fontWeight: 'medium' }} 
+                />
+              ))}
+            </Stack>
+          </Box>
+        )}
+
+        <Divider sx={{ mb: 4 }} />
+
+        {/* Блок голосования */}
+        <Box sx={{ bgcolor: '#f8fafc', p: 4, borderRadius: 2, textAlign: 'center', border: '1px solid #e2e8f0' }}>
+          <Typography variant="h6" fontWeight="bold" color="#0f172a" mb={2}>
+            Статья была полезна?
+          </Typography>
+          <Button 
+            variant={voted ? "contained" : "outlined"}
+            color="success" 
+            size="large"
+            onClick={handleVote} 
+            disabled={voted}
+            disableElevation
+            sx={{ 
+              fontWeight: 'bold', 
+              px: 4, 
+              py: 1.5,
+              borderWidth: voted ? 0 : 2,
+              '&:hover': { borderWidth: voted ? 0 : 2 }
+            }}
+          >
+            {voted ? `Спасибо за оценку! (${article.helpful_count})` : `Да, помогло (${article.helpful_count})`}
+          </Button>
+        </Box>
+
+      </Paper>
+    </Container>
   );
 };
 

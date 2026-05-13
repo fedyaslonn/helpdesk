@@ -46,7 +46,7 @@ const KBList = () => {
           База знаний
         </Typography>
         {isWorker && (
-          <Button variant="contained" color="primary" onClick={() => navigate('/helpdesk/kb/create')}>
+          <Button variant="contained" color="primary" onClick={() => navigate('/helpdesk/kb-articles/create')}>
             Написать статью
           </Button>
         )}

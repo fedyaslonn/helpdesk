@@ -1,6 +1,9 @@
-from rest_framework import serializers
+from datetime import timedelta
+
 from django.utils import timezone
-from core.models import Ticket, User, SupportEngineer
+from rest_framework import serializers
+from core.ai.ticket_classifier import classify_ticket
+from core.models import Priority, Ticket, User, SupportEngineer
 from core.serializers.comments import GetCommentSerializer
 
 
@@ -15,6 +18,8 @@ class TicketSerializer(serializers.ModelSerializer):
     comments = GetCommentSerializer(many=True, read_only=True) # Вкладываем комменты
 
     # Поля для записи
+    priority_name = serializers.CharField(source="priority.name", read_only=True)
+    priority = serializers.PrimaryKeyRelatedField(queryset=Priority.objects.all(), required=False, allow_null=True)
     assigned_engineer = serializers.PrimaryKeyRelatedField(
         queryset=SupportEngineer.objects.select_related('user'),
         required=False, allow_null=True,
@@ -25,9 +30,10 @@ class TicketSerializer(serializers.ModelSerializer):
         model = Ticket
         fields = [
             'id', 'ticket_number', 'category', 'organization', 
-            'assigned_engineer', 'assignee', 'requestor', 'user',
+            'priority', 'assigned_engineer', 'assignee', 'requestor', 'user',
             'sla_deadline', 'status', 'description', 'created_at', 'updated_at', 
-            'comments_count', 'is_sla_breached', 'comments'
+            'comments_count', 'is_sla_breached', 'comments',
+            'priority_name',
         ]
         read_only_fields = [
             'id', 'ticket_number', 'sla_deadline', 'user',
@@ -92,4 +98,5 @@ class TicketSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data['user'] = self.context['request'].user
+
         return super().create(validated_data)

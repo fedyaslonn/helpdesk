@@ -10,7 +10,9 @@ import {
   closeTicket, 
   updateTicket,
   getEngineers,
-  approveResolution
+  approveResolution,
+  getKBSuggest,
+  voteKBArticle
 } from "../services/ticket-management-api";
 
 import TicketResolution from "./TicketResolution";
@@ -30,7 +32,12 @@ import {
   TextField,
   MenuItem,
   Stack,
-  Alert
+  Alert,
+  Snackbar,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction
 } from "@mui/material";
 
 const getStatusChip = (status) => {
@@ -63,6 +70,11 @@ const TicketDetail = () => {
   const [selectedStatus, setSelectedStatus] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [actionError, setActionError] = useState(null);
+  const [kbSuggest, setKbSuggest] = useState(null);
+  const [kbLoading, setKbLoading] = useState(false);
+  const [kbError, setKbError] = useState(null);
+  const [resolutionDraft, setResolutionDraft] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const loadData = async () => {
     setIsLoading(true);
@@ -88,6 +100,44 @@ const TicketDetail = () => {
   useEffect(() => {
     loadData();
   }, [id, currentUser]);
+
+  useEffect(() => {
+    const loadSuggest = async () => {
+      if (!ticket) return;
+      const isAdmin = currentUser?.role === 'admin';
+      const isEngineer = currentUser?.role === 'engineer';
+      const isAssignee = ticket.assignee?.id === currentUser?.id;
+      if (!(isAdmin || (isEngineer && isAssignee))) return;
+
+      setKbLoading(true);
+      setKbError(null);
+      try {
+        const res = await getKBSuggest(ticket.id);
+        setKbSuggest(res.data);
+      } catch (e) {
+        setKbError(e.response?.data?.detail || 'Не удалось получить подсказки Базы знаний');
+      } finally {
+        setKbLoading(false);
+      }
+    };
+    loadSuggest();
+  }, [ticket, currentUser]);
+
+  const showMessage = (message, severity = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const attachTextAsResolution = async (text, articleIdForVote = null) => {
+    setResolutionDraft(text);
+    if (articleIdForVote) {
+      try {
+        await voteKBArticle(articleIdForVote, { helpful: true });
+      } catch (e) {
+        // не блокируем UX
+      }
+    }
+    showMessage('Текст добавлен в резолюцию');
+  };
 
   const handleDelete = async () => {
     if (!window.confirm("Вы уверены, что хотите удалить заявку НАВСЕГДА?")) return;
@@ -274,6 +324,91 @@ const TicketDetail = () => {
         <Box sx={{ width: { xs: '100%', md: '35%' }, position: 'sticky', top: 90 }}>
           <Stack spacing={3}>
 
+            {/* 💡 Возможные решения (KB + Ollama) */}
+            {(isAdmin || isAssignee) && (
+              <Card elevation={0} sx={{ bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+                  <Typography variant="subtitle1" fontWeight="bold" color="#334155" mb={1}>
+                    💡 Возможные решения
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" mb={2}>
+                    Подсказки из Базы знаний и черновик ответа клиенту.
+                  </Typography>
+
+                  {kbLoading && (
+                    <Box display="flex" alignItems="center" gap={2} py={1}>
+                      <CircularProgress size={18} />
+                      <Typography variant="body2" color="text.secondary">Ищу по Базе знаний…</Typography>
+                    </Box>
+                  )}
+
+                  {kbError && <Alert severity="warning" sx={{ mb: 2 }}>{kbError}</Alert>}
+
+                  {!kbLoading && kbSuggest?.generated_draft && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                        Черновик от ИИ
+                      </Typography>
+                      <Box sx={{ bgcolor: 'white', border: '1px solid #e2e8f0', borderRadius: 2, p: 2 }}>
+                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                          {kbSuggest.generated_draft}
+                        </Typography>
+                      </Box>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        fullWidth
+                        sx={{ mt: 1.5 }}
+                        onClick={() => attachTextAsResolution(kbSuggest.generated_draft, kbSuggest.top_article_id)}
+                        disableElevation
+                      >
+                        Прикрепить как решение (ответ ИИ)
+                      </Button>
+                    </Box>
+                  )}
+
+                  {!kbLoading && (kbSuggest?.articles?.length > 0) ? (
+                    <List dense sx={{ p: 0 }}>
+                      {kbSuggest.articles.map((a) => (
+                        <ListItem key={a.id} sx={{ px: 0 }}>
+                          <ListItemText
+                            primary={
+                              <Typography fontWeight={700} variant="body2" noWrap title={a.title}>
+                                {a.title}
+                              </Typography>
+                            }
+                            secondary={
+                              <Typography variant="caption" color="text.secondary" noWrap title={a.excerpt}>
+                                {a.category_name ? `${a.category_name} • ` : ''}{a.excerpt}
+                              </Typography>
+                            }
+                          />
+                          <ListItemSecondaryAction>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Chip label={Math.round((a.score || 0) * 10) / 10} size="small" />
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => attachTextAsResolution(a.content, a.id)}
+                              >
+                                Прикрепить
+                              </Button>
+                            </Stack>
+                          </ListItemSecondaryAction>
+                        </ListItem>
+                      ))}
+                    </List>
+                  ) : (
+                    !kbLoading && !kbError && (
+                      <Typography variant="body2" color="text.secondary">
+                        Релевантных статей не найдено.
+                      </Typography>
+                    )
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Блок подтверждения решения (Появляется только у Автора/Админа в статусе WR) */}
             {ticket.status === 'WR' && (isAuthor || isAdmin) && (
               <Card elevation={0} sx={{ bgcolor: '#f0fdf4', borderRadius: 2, border: '1px solid #bbf7d0' }}>
@@ -409,7 +544,11 @@ const TicketDetail = () => {
 
       {/* ДОЧЕРНИЕ КОМПОНЕНТЫ */}
       <Box mt={5}>
-        <TicketResolution ticketId={ticket.id} />
+        <TicketResolution
+          ticketId={ticket.id}
+          externalSolutionDraft={resolutionDraft}
+          onConsumeDraft={() => setResolutionDraft(null)}
+        />
       </Box>
       <Box mt={4}>
         <TicketSessions ticketId={ticket.id} assigneeId={ticket.assignee?.id} />
@@ -417,6 +556,22 @@ const TicketDetail = () => {
       <Box mt={4}>
         <TicketComments ticketId={ticket.id} />
       </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3500}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
 
     </Container>
   );

@@ -7,12 +7,83 @@ from django.core.mail import EmailMultiAlternatives, send_mail
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import strip_tags
+from datetime import timedelta
+from .kb.elasticsearch_client import delete_article, index_article
+from core.models import KnowledgeBaseArticle, Ticket
 
-from .models import Ticket
+from core.ai.ticket_classifier import classify_ticket
+import time
+from core.metrics import (
+    AI_CLASSIFICATION_DURATION, AI_CLASSIFICATION_REQUESTS, AI_PRIORITY_ASSIGNED
+)
+
 
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
+
+
+@shared_task
+def process_ai_classification_and_assignment(ticket_id):
+    """Фоновая задача для обработки тикета нейросетью и авто-назначения"""
+    try:
+        ticket = Ticket.objects.get(id=ticket_id)
+        
+        # 1. Запускаем Ollama
+        decision = classify_ticket(ticket.description)
+        
+        # Обновляем приоритет и SLA
+        ticket.priority = decision.priority
+        if decision.resolution_minutes:
+            ticket.sla_deadline = ticket.created_at + timedelta(minutes=decision.resolution_minutes)
+        ticket.save(update_fields=['priority', 'sla_deadline', 'updated_at'])
+
+        # 2. Теперь, когда у нас есть приоритет, делаем авто-назначение
+        with transaction.atomic():
+            ticket = Ticket.objects.auto_assign(ticket)
+
+        # 3. Если ИИ успешно назначил инженера, отправляем ему уведомление
+        if ticket.assigned_engineer:
+            Notification.objects.create(
+                user=ticket.assigned_engineer.user, 
+                ticket=ticket,
+                message=f"Вам автоматически назначена заявка {ticket.ticket_number} (Приоритет: {ticket.priority.name})",
+                notification_type=Notification.Type.ASSIGNED
+            )
+            
+    except Exception as e:
+        # Если что-то пошло не так (например, БД недоступна), просто пишем в логи Celery
+        print(f"Ошибка в фоновой классификации тикета {ticket_id}: {str(e)}")
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=2)
+def index_kb_article_task(self, article_id: int):
+    """
+    Асинхронная индексация KB статьи в Elasticsearch.
+    Запускается ТОЛЬКО после commit транзакции (через transaction.on_commit).
+    """
+    try:
+        article = (
+            KnowledgeBaseArticle.objects.select_related("category")
+            .only("id", "title", "content", "tags", "is_published", "updated_at", "category__id", "category__name")
+            .get(pk=article_id)
+        )
+
+        doc = {
+            "title": article.title,
+            "content": article.content,
+            "category_name": article.category.name if article.category_id else "",
+            "category_id": article.category_id,
+            "tags": [t.strip() for t in (article.tags or "").split(",") if t.strip()],
+            "is_published": bool(article.is_published),
+            "updated_at": article.updated_at.isoformat() if article.updated_at else None,
+        }
+        index_article(article_id=article.id, doc=doc)
+    except KnowledgeBaseArticle.DoesNotExist:
+        # если статью удалили до таски — удаляем из индекса
+        delete_article(article_id=article_id)
+    except Exception as e:
+        logger.error(f"Failed to index KB article {article_id}: {e}")
+        raise self.retry(exc=e)
 
 
 @shared_task(bind=True, max_retries=3)
@@ -301,3 +372,25 @@ def send_resolution_approved_notification(self, ticket_id):
             f"Failed to send resolution notification for {ticket_id}: {str(e)}"
         )
         self.retry(exc=e, countdown=2**self.request.retries)
+
+@shared_task(bind=True, max_retries=3)
+def process_ai_classification_and_assignment(self, ticket_id):
+    try:
+        ticket = Ticket.objects.get(id=ticket_id)
+        
+        # 1. Засекаем время работы ИИ
+        start_time = time.time()
+        decision = classify_ticket(ticket.description)
+        duration = time.time() - start_time
+        
+        # Записываем метрики ИИ
+        AI_CLASSIFICATION_DURATION.observe(duration)
+        AI_CLASSIFICATION_REQUESTS.labels(status=decision.source).inc() # 'ollama' или 'fallback'
+        AI_PRIORITY_ASSIGNED.labels(priority=decision.priority.name).inc()
+
+        # ... (здесь твой код сохранения приоритета и SLA из прошлого ответа) ...
+        
+    except Exception as e:
+        # Если всё сломалось, тоже фиксируем метрику
+        AI_CLASSIFICATION_REQUESTS.labels(status='error').inc()
+        print(f"Ошибка классификации: {e}")

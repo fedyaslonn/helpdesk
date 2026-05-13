@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { getResolutions, createResolution, updateResolution, deleteResolution } from '../services/ticket-management-api';
 
@@ -15,7 +15,7 @@ import {
   Paper
 } from '@mui/material';
 
-const TicketResolution = ({ ticketId }) => {
+const TicketResolution = ({ ticketId, externalSolutionDraft, onConsumeDraft }) => {
   const { user: currentUser } = useAuth();
   
   const isWorker = currentUser?.role === 'admin' || currentUser?.role === 'engineer';
@@ -62,6 +62,17 @@ const TicketResolution = ({ ticketId }) => {
   useEffect(() => {
     if (ticketId) fetchResolution();
   }, [ticketId]);
+
+  useEffect(() => {
+    if (!externalSolutionDraft) return;
+    // Превращаем в "черновик" резолюции: открываем форму и заполняем описание решения
+    setIsEditing(true);
+    setFormData((prev) => ({
+      ...prev,
+      solution_description: externalSolutionDraft,
+    }));
+    if (onConsumeDraft) onConsumeDraft();
+  }, [externalSolutionDraft, onConsumeDraft]);
 
   const handleFormChange = (e) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));

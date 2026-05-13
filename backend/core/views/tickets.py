@@ -13,7 +13,7 @@ from core.serializers.comments import PartialUpdateCommentSerializer, GetComment
 from core.filters.tickets import TicketFilter
 from core.permissions import CanInteractWithTicket, IsAdminOrEngineer
 
-from core.tasks import send_remove_assignee_notification
+from core.tasks import send_ticket_created_notification, process_ai_classification_and_assignment
 
 
 class TicketViewSet(viewsets.ModelViewSet):
@@ -52,13 +52,20 @@ class TicketViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         ticket = serializer.save(user=self.request.user)
         # Автоматическое уведомление
+        
+        # 3. Системные уведомления и Email клиенту (что заявка создана)
         Notification.objects.create(
             user=ticket.user, ticket=ticket,
             message=f"Заявка {ticket.ticket_number} успешно создана",
             notification_type=Notification.Type.TICKET_CREATED
         )
-
+        # 4. 🔥 Отправляем уведомление клиенту (что заявка создана)
         transaction.on_commit(lambda: send_ticket_created_notification.delay(ticket.id))
+        
+        # 3. 🔥 Отправляем тикет на обработку ИИ и авто-назначение!
+        transaction.on_commit(lambda: process_ai_classification_and_assignment.delay(ticket.id))
+
+
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrEngineer])
     def assign(self, request, pk=None):

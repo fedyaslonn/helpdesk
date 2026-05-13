@@ -26,6 +26,12 @@ export const autoAssignTicket = (ticketId) =>
 export const closeTicket = (ticketId) => 
   apiClientInstance.post(`/helpdesk/tickets/${ticketId}/close/`)
 
+export const approveResolution = (ticketId) =>
+  apiClientInstance.post(`/helpdesk/tickets/${ticketId}/approve_resolution/`)
+
+export const unassignTicket = (ticketId) =>
+  apiClientInstance.post(`/helpdesk/tickets/${ticketId}/unassign/`)
+
 // === КАТЕГОРИИ (вместо организаций) ===
 export const getCategories = () => apiClientInstance.get('/helpdesk/categories/')
 
@@ -93,6 +99,10 @@ export const updateKBArticle = (id, data) => apiClientInstance.patch(`/helpdesk/
 export const deleteKBArticle = (id) => apiClientInstance.delete(`/helpdesk/kb-articles/${id}/`)
 export const voteKBArticle = (id, data) => apiClientInstance.post(`/helpdesk/kb-articles/${id}/vote/`, data)
 
+// KB proactive suggestions for a ticket (engineer assignee / admin)
+export const getKBSuggest = (ticketId) =>
+  apiClientInstance.get('/helpdesk/kb/suggest/', { params: { ticket_id: ticketId } })
+
 export const getNotifications = (params = {}) => apiClientInstance.get('/helpdesk/notifications/', { params })
 export const markAllNotificationsRead = () => apiClientInstance.post('/helpdesk/notifications/mark_all_read/')
 export const markNotificationRead = (id) => apiClientInstance.post(`/helpdesk/notifications/${id}/mark_read/`)
@@ -103,12 +113,27 @@ export const createPriority = (data) => apiClientInstance.post('/helpdesk/priori
 export const updatePriority = (id, data) => apiClientInstance.patch(`/helpdesk/priorities/${id}/`, data);
 export const deletePriority = (id) => apiClientInstance.delete(`/helpdesk/priorities/${id}/`);
 
+/** Правила авто-классификации тикетов (MongoDB), только admin */
+export const getClassificationRules = () =>
+  apiClientInstance.get('/helpdesk/classification-rules/');
+export const createClassificationRule = (data) =>
+  apiClientInstance.post('/helpdesk/classification-rules/', data);
+export const updateClassificationRule = (id, data) =>
+  apiClientInstance.patch(`/helpdesk/classification-rules/${id}/`, data);
+export const deleteClassificationRule = (id) =>
+  apiClientInstance.delete(`/helpdesk/classification-rules/${id}/`);
+
 export const getShifts = (params = {}) => apiClientInstance.get('/helpdesk/shifts/', { params });
 export const createShift = (data) => apiClientInstance.post('/helpdesk/shifts/', data);
 export const updateShift = (id, data) => apiClientInstance.patch(`/helpdesk/shifts/${id}/`, data);
 export const deleteShift = (id) => apiClientInstance.delete(`/helpdesk/shifts/${id}/`);
 export const getTodayShifts = () => apiClientInstance.get('/helpdesk/shifts/today/');
 
-export const approveResolution = (id) => axiosInstance.post(`/tickets/${id}/approve_resolution/`);
+// NOTE: older exports below referenced axiosInstance which isn't defined in this file.
+// Keep them disabled to avoid runtime errors if imported.
 
-export const unassignTicket = (id) => axiosInstance.post(`/tickets/${id}/unassign/`);
+
+export const getSystemMetrics = () => {
+  // Обрати внимание на путь, в логах у тебя /helpdesk/api/metrics/
+  return apiClientInstance.get('/helpdesk/api/metrics/'); 
+};

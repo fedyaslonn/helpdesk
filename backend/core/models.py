@@ -284,6 +284,13 @@ class Ticket(TimestampedModel):
     ticket_number = models.CharField(max_length=20, unique=True, editable=False, verbose_name=_("Номер заявки"))
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tickets", verbose_name=_("Автор"))
     category = models.ForeignKey(Category, on_delete=models.PROTECT, verbose_name=_("Категория"))
+    priority = models.ForeignKey(
+        Priority,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        verbose_name=_("Приоритет"),
+    )
     assigned_engineer = models.ForeignKey(
         SupportEngineer, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="assigned_tickets", verbose_name=_("Назначенный инженер")
@@ -301,15 +308,21 @@ class Ticket(TimestampedModel):
         ordering = ["-created_at"]
 
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
         if not self.ticket_number:
             self.ticket_number = f"TK-{uuid.uuid4().hex[:8].upper()}"
-        if not self.sla_deadline and self.pk is None:
+        
+        if is_new and not getattr(self, 'sla_deadline', None):
             self._calculate_sla_deadline()
+        
         super().save(*args, **kwargs)
 
     def _calculate_sla_deadline(self):
+        effective_priority = self.priority or self.category.default_priority
+        if not effective_priority:
+            return
         sla = SLAParameter.objects.filter(
-            priority=self.category.default_priority,
+            priority=effective_priority,
             category=self.category
         ).first()
         if sla:
