@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthContext';
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../services/ticket-management-api';
 
 import {
-  Container, Box, Typography, Button, Paper, CircularProgress, Alert,
+  Box, Typography, Button, Paper, CircularProgress, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Stack
 } from '@mui/material';
 
@@ -158,7 +158,7 @@ const CategoriesPage = () => {
 
   if (isLoading) {
     return (
-      <Box display="flex" flexDirection="column" alignItems="center" mt={10}>
+      <Box display="flex" flexDirection="column" alignItems="center" sx={{ mt: 10, px: 2, py: 4 }}>
         <CircularProgress size={40} />
         <Typography mt={2} color="text.secondary">Загрузка...</Typography>
       </Box>
@@ -166,13 +166,37 @@ const CategoriesPage = () => {
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 6, mb: 8 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-        <Typography variant="h4" fontWeight="bold" color="#1e293b">
+    <Box
+      component="main"
+      sx={{
+        width: '100%',
+        maxWidth: 900,
+        mx: 'auto',
+        boxSizing: 'border-box',
+        px: { xs: '16px', sm: '24px', md: '32px' },
+        py: { xs: 3, sm: 4, md: 5 },
+        mb: { xs: 4, sm: 6 },
+      }}
+    >
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems={{ xs: 'stretch', sm: 'center' }}
+        flexDirection={{ xs: 'column', sm: 'row' }}
+        gap={2}
+        mb={{ xs: 3, sm: 4 }}
+        textAlign={{ xs: 'center', sm: 'left' }}
+      >
+        <Typography variant="h4" fontWeight="bold" color="#1e293b" sx={{ alignSelf: { xs: 'center', sm: 'auto' } }}>
           Справочник категорий
         </Typography>
         {isAdmin && (
-          <Button variant="contained" color="primary" onClick={() => openModal()}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => openModal()}
+            sx={{ alignSelf: { xs: 'center', sm: 'auto' }, flexShrink: 0 }}
+          >
             Добавить категорию
           </Button>
         )}
@@ -180,29 +204,41 @@ const CategoriesPage = () => {
 
       {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
-      <Paper elevation={0} sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 3 }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2, sm: 3, md: 3.5 },
+          border: '1px solid #e2e8f0',
+          borderRadius: 3,
+          bgcolor: 'background.paper',
+        }}
+      >
         {rootCategories.length === 0 ? (
-          <Typography color="text.secondary" textAlign="center">Категории не найдены</Typography>
+          <Typography color="text.secondary" textAlign="center" sx={{ py: 2 }}>
+            Категории не найдены
+          </Typography>
         ) : (
-          rootCategories.map(rootCat => (
-            <CategoryNode 
-              key={rootCat.id} 
-              category={rootCat} 
-              allCategories={categories} 
-              onEdit={openModal} 
-              onDelete={handleDelete}
-              isAdmin={isAdmin}
-            />
-          ))
+          <Stack spacing={1.5}>
+            {rootCategories.map((rootCat) => (
+              <CategoryNode
+                key={rootCat.id}
+                category={rootCat}
+                allCategories={categories}
+                onEdit={openModal}
+                onDelete={handleDelete}
+                isAdmin={isAdmin}
+              />
+            ))}
+          </Stack>
         )}
       </Paper>
 
       <Dialog open={isModalOpen} onClose={closeModal} fullWidth maxWidth="sm">
-        <DialogTitle fontWeight="bold">
+        <DialogTitle fontWeight="bold" sx={{ px: 3, pt: 2.5, pb: 1 }}>
           {editingCategory ? 'Редактировать категорию' : 'Новая категория'}
         </DialogTitle>
         <Box component="form" onSubmit={handleSubmit}>
-          <DialogContent dividers>
+          <DialogContent dividers sx={{ px: 3, py: 2.5 }}>
             <Stack spacing={3}>
               <TextField
                 label="Название"
@@ -237,7 +273,7 @@ const CategoriesPage = () => {
               />
             </Stack>
           </DialogContent>
-          <DialogActions sx={{ p: 2 }}>
+          <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
             <Button onClick={closeModal} color="inherit" disabled={isSubmitting}>Отмена</Button>
             <Button type="submit" variant="contained" color="primary" disabled={isSubmitting}>
               {isSubmitting ? 'Сохранение...' : 'Сохранить'}
@@ -245,7 +281,7 @@ const CategoriesPage = () => {
           </DialogActions>
         </Box>
       </Dialog>
-    </Container>
+    </Box>
   );
 };
 

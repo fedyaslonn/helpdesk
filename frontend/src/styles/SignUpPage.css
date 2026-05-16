@@ -1,0 +1,83 @@
+/* Create user / signup-style формы (UserCreation, CommentCreation) */
+
+.create-user-page {
+  min-height: 60vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.create-user-container {
+  width: 100%;
+  max-width: 440px;
+  padding: 2rem;
+  background: var(--hd-surface, #fff);
+  border: 1px solid var(--hd-border, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: var(--hd-shadow-md, 0 4px 14px rgba(15, 23, 42, 0.1));
+}
+
+.create-user-container h2 {
+  margin: 0 0 1.25rem;
+  font-size: 1.35rem;
+  color: var(--hd-text, #0f172a);
+}
+
+.create-user-container .form-group {
+  margin-bottom: 1.1rem;
+}
+
+.create-user-container .form-group label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #475569;
+}
+
+.create-user-container .form-group input,
+.create-user-container .form-group textarea {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.9375rem;
+  border: 1px solid var(--hd-border-strong, #cbd5e1);
+  border-radius: var(--hd-radius, 8px);
+  font-family: inherit;
+}
+
+.create-user-container .form-group textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.create-user-container .form-group input:focus,
+.create-user-container .form-group textarea:focus {
+  outline: none;
+  border-color: var(--hd-primary, #7c3aed);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
+}
+
+.create-user-container .button {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.7rem 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #fff;
+  background: var(--hd-primary, #7c3aed);
+  border: none;
+  border-radius: var(--hd-radius, 8px);
+  cursor: pointer;
+  box-shadow: var(--hd-shadow, 0 1px 3px rgba(15, 23, 42, 0.08));
+  transition: background 0.15s;
+}
+
+.create-user-container .button:hover {
+  background: var(--hd-primary-dark, #5b21b6);
+}
+
+.create-user-container .error {
+  margin-bottom: 1rem;
+}

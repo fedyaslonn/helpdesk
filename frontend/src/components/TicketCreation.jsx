@@ -4,7 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 import { getCategories, createTicket } from '../services/ticket-management-api';
 
 import {
-  Container, Box, Typography, TextField, Button, Paper, 
+  Box, Typography, TextField, Button, Paper,
   Alert, CircularProgress, MenuItem, Stack
 } from '@mui/material';
 
@@ -45,8 +45,8 @@ const TicketCreateForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.category) {
-        setError('Необходимо выбрать категорию');
-       return;
+      setError('Необходимо выбрать категорию')
+      return
     }
     setIsSubmitting(true);
     try {
@@ -66,7 +66,7 @@ const TicketCreateForm = () => {
 
   if (isLoading) {
     return (
-      <Box display="flex" flexDirection="column" alignItems="center" mt={10}>
+      <Box display="flex" flexDirection="column" alignItems="center" sx={{ mt: 10, px: 2, py: 4 }}>
         <CircularProgress size={40} />
         <Typography mt={2} color="text.secondary">Подготовка формы...</Typography>
       </Box>
@@ -74,15 +74,34 @@ const TicketCreateForm = () => {
   }
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 8, mb: 8 }}>
-      <Paper elevation={0} sx={{ p: { xs: 3, md: 5 }, border: '1px solid #e2e8f0', borderRadius: 3 }}>
+    <Box
+      component="main"
+      sx={{
+        width: '100%',
+        maxWidth: 560,
+        mx: 'auto',
+        boxSizing: 'border-box',
+        px: { xs: '16px', sm: '24px', md: '32px' },
+        py: { xs: 3, sm: 4, md: 5 },
+        mb: { xs: 4, sm: 6 },
+      }}
+    >
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 3, sm: 4, md: 5 },
+          border: '1px solid #e2e8f0',
+          borderRadius: 3,
+          bgcolor: 'background.paper',
+        }}
+      >
         <Typography variant="h4" fontWeight="bold" color="#1e293b" mb={3}>
           Новая заявка
         </Typography>
 
         {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-        
-        <Box component="form" onSubmit={handleSubmit}>
+
+        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           <Stack spacing={3} mb={4}>
             <TextField
               select
@@ -92,7 +111,7 @@ const TicketCreateForm = () => {
               onChange={handleChange}
               fullWidth
               required
-              sx={{ bgcolor: 'white' }}
+              sx={{ bgcolor: 'background.paper' }}
             >
               {categories.map((cat) => (
                 <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
@@ -109,14 +128,14 @@ const TicketCreateForm = () => {
               rows={6}
               fullWidth
               required
-              sx={{ bgcolor: 'white' }}
+              sx={{ bgcolor: 'background.paper' }}
             />
           </Stack>
 
-          <Button 
-            type="submit" 
-            variant="contained" 
-            color="primary" 
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
             size="large"
             fullWidth
             disabled={isSubmitting}
@@ -126,7 +145,7 @@ const TicketCreateForm = () => {
           </Button>
         </Box>
       </Paper>
-    </Container>
+    </Box>
   );
 };
 

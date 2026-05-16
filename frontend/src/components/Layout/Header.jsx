@@ -60,7 +60,17 @@ const Header = () => {
 
   return (
     <AppBar position="sticky" sx={{ bgcolor: 'primary.dark', boxShadow: 3 }}>
-      <Toolbar sx={{ maxWidth: 1200, width: '100%', mx: 'auto' }}>
+      <Toolbar
+        sx={{
+          maxWidth: 1200,
+          width: '100%',
+          mx: 'auto',
+          flexWrap: 'wrap',
+          rowGap: 1,
+          py: { xs: 1, sm: 1.5 },
+          columnGap: 0.5,
+        }}
+      >
         
         {/* ЛОГОТИП */}
         <Typography 
@@ -81,7 +91,16 @@ const Header = () => {
         </Typography>
 
         {/* ОСНОВНАЯ НАВИГАЦИЯ */}
-        <Box sx={{ flexGrow: 1, display: 'flex', gap: 1 }}>
+        <Box
+          sx={{
+            flexGrow: 1,
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: 0.5,
+            minWidth: 0,
+          }}
+        >
           
           {/* 1. ТИКЕТЫ */}
           <Button 

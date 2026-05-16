@@ -155,21 +155,23 @@ function OrganizationMembersPage() {
         </div>
 
         <div className="header-actions">
-          <button onClick={() => navigate(-1)} className="btn back-btn">
+          <button type="button" onClick={() => navigate(-1)} className="btn back-btn">
             ← Back
           </button>
           <button
+            type="button"
             onClick={() => navigate("/organizations/applications")}
             className="btn-applications"
           >
-          Applications
-         </button>
-           <button
-        onClick={() => navigate(`/organizations/${organizationId}/update`)}
-        className="btn-update-org"
-      >
-        Update Organization
-  </button>
+            Applications
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(`/organizations/${organizationId}/update`)}
+            className="btn-update-org"
+          >
+            Update Organization
+          </button>
         </div>
       </div>
 

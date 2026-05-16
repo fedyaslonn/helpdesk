@@ -167,16 +167,16 @@ const EditTicket = () => {
   }
 
   return (
-    <div className="edit-ticket-container" style={{maxWidth: '800px', margin: '40px auto', padding: '20px', background: '#fff', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)'}}>
-      <div className="edit-header" style={{marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px'}}>
+    <div className="edit-ticket-container">
+      <div className="edit-header">
         <h1>Редактирование заявки #{ticket.ticket_number}</h1>
       </div>
 
       <div className="edit-form-card">
         <form onSubmit={handleSubmit} className="edit-form">
           
-          <div className="form-group" style={{marginBottom: '20px'}}>
-            <label htmlFor="description" style={{display: 'block', fontWeight: 'bold', marginBottom: '8px'}}>
+          <div className="form-group">
+            <label htmlFor="description">
               Описание проблемы
             </label>
             <textarea
@@ -189,12 +189,13 @@ const EditTicket = () => {
               placeholder="Подробно опишите проблему..."
               disabled={isSubmitting}
               rows={8}
-              style={{width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc'}}
             />
-            {formErrors.description && <span style={{color: 'red', fontSize: '12px'}}>{formErrors.description}</span>}
+            {formErrors.description && (
+              <span className="field-error-inline">{formErrors.description}</span>
+            )}
           </div>
 
-          <div className="form-actions" style={{display: 'flex', gap: '10px'}}>
+          <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={handleCancel} disabled={isSubmitting}>
               Отмена
             </button>

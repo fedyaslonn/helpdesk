@@ -1,0 +1,200 @@
+/* Заявки в организацию */
+
+.applications-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 0.25rem;
+}
+
+.applications-container .loading-spinner {
+  width: 48px;
+  height: 48px;
+  margin: 3rem auto;
+  border: 3px solid var(--hd-border, #e2e8f0);
+  border-top-color: var(--hd-primary, #7c3aed);
+  border-radius: 50%;
+  animation: hd-spin 0.75s linear infinite;
+}
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--hd-border, #e2e8f0);
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.header-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.applications-count {
+  font-size: 0.875rem;
+  color: var(--hd-text-muted, #64748b);
+}
+
+.refresh-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-right: 0.35rem;
+}
+
+.empty-state {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  background: #f8fafc;
+  border: 1px dashed var(--hd-border-strong, #cbd5e1);
+  border-radius: 12px;
+}
+
+.empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.applications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.application-card {
+  padding: 1.25rem;
+  background: var(--hd-surface, #fff);
+  border: 1px solid var(--hd-border, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: var(--hd-shadow, 0 1px 3px rgba(15, 23, 42, 0.06));
+}
+
+.application-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.user-info {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+
+.user-avatar {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--hd-primary-dark, #5b21b6);
+  background: #ede9fe;
+  border: 1px solid #c4b5fd;
+  border-radius: 12px;
+}
+
+.user-details h3.user-name {
+  margin: 0 0 0.2rem;
+  font-size: 1.1rem;
+}
+
+.user-username {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--hd-text-muted, #64748b);
+}
+
+.organization-name {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.application-meta {
+  text-align: right;
+}
+
+.application-status {
+  margin-bottom: 0.35rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.status-badge.status-pending {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
+.status-badge.status-approved {
+  color: #065f46;
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+.status-badge.status-rejected {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.application-time {
+  font-size: 0.8125rem;
+  color: var(--hd-text-muted, #64748b);
+}
+
+.applied-date,
+.time-since {
+  margin: 0.15rem 0;
+}
+
+.application-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--hd-border, #e2e8f0);
+}
+
+.application-processed {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--hd-border, #e2e8f0);
+  font-size: 0.875rem;
+  color: var(--hd-text-muted, #64748b);
+}
+
+.processed-label {
+  font-weight: 600;
+  color: #475569;
+}
+
+.application-actions .btn {
+  min-width: 7rem;
+}
+
+.application-actions .btn-spinner {
+  margin-right: 0.35rem;
+}

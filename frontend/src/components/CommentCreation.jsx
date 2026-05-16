@@ -1,6 +1,7 @@
 import { useState } from "react"
 import axios from "axios"
 import { serverApi } from '../contants'
+import '../styles/SignUpPage.css'
 
 function CreateComment() {
   const [text, setText] = useState("")

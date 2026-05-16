@@ -1,0 +1,401 @@
+/* HelpDesk — глобальная вёрстка и общие UI-классы (кнопки, поля, спиннеры) */
+
+:root {
+  --hd-primary: #7c3aed;
+  --hd-primary-dark: #5b21b6;
+  --hd-primary-light: #a78bfa;
+  --hd-danger: #dc2626;
+  --hd-danger-bg: #fef2f2;
+  --hd-success: #059669;
+  --hd-success-bg: #ecfdf5;
+  --hd-border: #e2e8f0;
+  --hd-border-strong: #cbd5e1;
+  --hd-text: #0f172a;
+  --hd-text-muted: #64748b;
+  --hd-surface: #ffffff;
+  --hd-page-bg: #f1f5f9;
+  --hd-radius: 8px;
+  --hd-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --hd-shadow-md: 0 4px 14px rgba(15, 23, 42, 0.1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--hd-text);
+  background: var(--hd-page-bg);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* --- Layout (Layout.jsx) --- */
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-container .content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-container .main-content {
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2rem;
+}
+
+@media (min-width: 768px) {
+  .app-container .main-content {
+    padding: 1.5rem 1.25rem 2.5rem;
+  }
+}
+
+/* --- Кнопки --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1.25;
+  text-decoration: none;
+  text-align: center;
+  border: 1px solid transparent;
+  border-radius: var(--hd-radius);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--hd-primary);
+  color: #fff;
+  border-color: var(--hd-primary-dark);
+  box-shadow: var(--hd-shadow);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--hd-primary-dark);
+}
+
+.btn-secondary {
+  background: var(--hd-surface);
+  color: var(--hd-text);
+  border-color: var(--hd-border-strong);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.btn-success {
+  background: var(--hd-success);
+  color: #fff;
+  border-color: #047857;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: #047857;
+}
+
+.btn-danger {
+  background: var(--hd-danger);
+  color: #fff;
+  border-color: #b91c1c;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8125rem;
+}
+
+.btn-light {
+  background: #f8fafc;
+  color: var(--hd-text);
+  border-color: var(--hd-border);
+}
+
+.btn-light:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.btn-icon {
+  width: 1.1em;
+  height: 1.1em;
+  flex-shrink: 0;
+}
+
+.btn-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: hd-spin 0.7s linear infinite;
+}
+
+.btn-secondary .btn-spinner {
+  border-color: rgba(15, 23, 42, 0.15);
+  border-top-color: var(--hd-primary);
+}
+
+/* --- Поля форм --- */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #475569;
+}
+
+.form-control,
+.form-group input:not([type="checkbox"]):not([type="radio"]),
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  max-width: 100%;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  color: var(--hd-text);
+  background: var(--hd-surface);
+  border: 1px solid var(--hd-border-strong);
+  border-radius: var(--hd-radius);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.form-control:focus,
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--hd-primary);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+}
+
+.form-control.is-invalid,
+.form-group input.is-invalid,
+.form-group textarea.is-invalid {
+  border-color: var(--hd-danger);
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 1.25rem;
+}
+
+/* --- Сообщения и загрузка --- */
+.loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--hd-text-muted);
+}
+
+.error {
+  margin: 1rem auto;
+  max-width: 42rem;
+  padding: 1rem 1.25rem;
+  color: #991b1b;
+  background: var(--hd-danger-bg);
+  border: 1px solid #fecaca;
+  border-radius: var(--hd-radius);
+}
+
+.error-message {
+  padding: 1rem 1.25rem;
+  color: #991b1b;
+  background: var(--hd-danger-bg);
+  border: 1px solid #fecaca;
+  border-radius: var(--hd-radius);
+}
+
+.error-message h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.error-message p {
+  margin: 0 0 1rem;
+  color: #b91c1c;
+}
+
+.success-message {
+  padding: 0.75rem 1rem;
+  color: #065f46;
+  background: var(--hd-success-bg);
+  border: 1px solid #a7f3d0;
+  border-radius: var(--hd-radius);
+  margin-bottom: 1rem;
+}
+
+/* --- Спиннер --- */
+@keyframes hd-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 2rem auto;
+  border: 3px solid var(--hd-border);
+  border-top-color: var(--hd-primary);
+  border-radius: 50%;
+  animation: hd-spin 0.75s linear infinite;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  gap: 1rem;
+  color: var(--hd-text-muted);
+}
+
+.loading-container .loading-spinner:empty {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--hd-border);
+  border-top-color: var(--hd-primary);
+  border-radius: 50%;
+  animation: hd-spin 0.75s linear infinite;
+}
+
+/* --- Назначение админа (AdminAssignmentButton) --- */
+.btn-assign-admin {
+  margin-left: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--hd-primary-dark);
+  background: #ede9fe;
+  border: 1px solid #c4b5fd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-assign-admin:hover:not(:disabled) {
+  background: #ddd6fe;
+}
+
+.btn-assign-admin:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.confirmation-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.confirmation-modal .modal-content {
+  width: 100%;
+  max-width: 420px;
+  padding: 1.5rem;
+  background: var(--hd-surface);
+  border-radius: 12px;
+  box-shadow: var(--hd-shadow-md);
+  border: 1px solid var(--hd-border);
+}
+
+.confirmation-modal .modal-content h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+.confirmation-modal .modal-content p {
+  margin: 0 0 1.25rem;
+  color: var(--hd-text-muted);
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.btn-cancel {
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid var(--hd-border-strong);
+  border-radius: var(--hd-radius);
+  cursor: pointer;
+}
+
+.btn-cancel:hover {
+  background: #e2e8f0;
+}
+
+.btn-confirm {
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #fff;
+  background: var(--hd-primary);
+  border: 1px solid var(--hd-primary-dark);
+  border-radius: var(--hd-radius);
+  cursor: pointer;
+}
+
+.btn-confirm:hover:not(:disabled) {
+  background: var(--hd-primary-dark);
+}
+
+.btn-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

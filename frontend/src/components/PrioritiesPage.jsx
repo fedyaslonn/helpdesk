@@ -89,7 +89,7 @@ const PrioritiesPage = () => {
 
   if (isLoading) {
     return (
-      <Box display="flex" flexDirection="column" alignItems="center" mt={10}>
+      <Box display="flex" flexDirection="column" alignItems="center" sx={{ mt: 10, px: 2, py: 4 }}>
         <CircularProgress size={40} />
         <Typography mt={2} color="text.secondary">Загрузка...</Typography>
       </Box>
@@ -97,19 +97,50 @@ const PrioritiesPage = () => {
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 6, mb: 8 }}>
-      <Typography variant="h4" fontWeight="bold" color="#1e293b" mb={4}>
+    <Container
+      maxWidth="md"
+      sx={{
+        mt: { xs: 3, sm: 5 },
+        mb: { xs: 6, sm: 8 },
+        px: { xs: 2, sm: 3 },
+        py: { xs: 1, sm: 0 },
+      }}
+    >
+      <Typography variant="h4" fontWeight="bold" color="#1e293b" mb={{ xs: 3, sm: 4 }} sx={{ px: { xs: 0.5, sm: 0 } }}>
         Справочник приоритетов
       </Typography>
 
-      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 3, mx: { xs: 0.5, sm: 0 } }}>{error}</Alert>}
 
       {isAdmin && (
-        <Paper elevation={0} sx={{ p: 3, mb: 4, bgcolor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 3 }}>
-          <Typography variant="subtitle1" fontWeight="bold" mb={2}>
+        <Paper
+          elevation={0}
+          sx={{
+            p: { xs: 2.5, sm: 3.5 },
+            mb: { xs: 3, sm: 4 },
+            bgcolor: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: 3,
+          }}
+        >
+          <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, px: { xs: 0.5, sm: 1 } }}>
             {isEditing ? 'Редактирование приоритета' : 'Новый приоритет'}
           </Typography>
-          <Box component="form" onSubmit={handleSubmit} display="flex" gap={2} alignItems="flex-start" flexWrap="wrap">
+          <Box
+            component="form"
+            onSubmit={handleSubmit}
+            sx={{
+              display: 'flex',
+              gap: 2,
+              alignItems: 'flex-start',
+              flexWrap: 'wrap',
+              p: { xs: 1.5, sm: 2 },
+              pt: { xs: 2, sm: 2.5 },
+              bgcolor: '#fff',
+              border: '1px solid #e2e8f0',
+              borderRadius: 2,
+            }}
+          >
             <TextField 
               label="Название" 
               name="name" 
@@ -117,7 +148,7 @@ const PrioritiesPage = () => {
               value={formData.name} 
               onChange={handleFormChange} 
               required 
-              sx={{ flexGrow: 1, bgcolor: 'white' }}
+              sx={{ flexGrow: 1, minWidth: 200, bgcolor: 'white' }}
               size="small"
             />
             <TextField 
@@ -128,10 +159,10 @@ const PrioritiesPage = () => {
               value={formData.level} 
               onChange={handleFormChange} 
               required 
-              sx={{ width: 120, bgcolor: 'white' }}
+              sx={{ width: { xs: '100%', sm: 120 }, maxWidth: 160, bgcolor: 'white' }}
               size="small"
             />
-            <Stack direction="row" spacing={1}>
+            <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-end', sm: 'flex-start' }, pt: { xs: 0.5, sm: 0 } }}>
               {isEditing && (
                 <Button variant="outlined" color="inherit" onClick={resetForm} disabled={isSubmitting}>
                   Отмена
@@ -146,9 +177,19 @@ const PrioritiesPage = () => {
       )}
 
       {priorities.length === 0 ? (
-        <Alert severity="info">Приоритеты не настроены.</Alert>
+        <Alert severity="info" sx={{ mx: { xs: 0.5, sm: 0 } }}>Приоритеты не настроены.</Alert>
       ) : (
-        <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 2 }}>
+        <TableContainer
+          component={Paper}
+          elevation={0}
+          sx={{
+            border: '1px solid #e2e8f0',
+            borderRadius: 2,
+            mt: 1,
+            mx: { xs: 0.5, sm: 0 },
+            overflow: 'hidden',
+          }}
+        >
           <Table>
             <TableHead sx={{ bgcolor: '#f1f5f9' }}>
               <TableRow>
