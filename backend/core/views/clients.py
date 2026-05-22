@@ -18,6 +18,17 @@ from core.serializers.clients import (
 from ..permissions import IsAdminOrSelf, IsAdminOrEngineerSelf, CanManageRole
 from django.db.models import Count, Q
 
+from rest_framework.pagination import PageNumberPagination
+
+from django.http import HttpResponse
+import openpyxl
+from docx import Document
+
+class UserFivePerPagePagination(PageNumberPagination):
+    page_size = 5
+    page_size_query_param = 'page_size'
+    max_page_size = 50
+
 
 class UserProfileViewSet(
     mixins.ListModelMixin,
@@ -44,6 +55,8 @@ class UserProfileViewSet(
     ordering_fields = ['date_joined', 'role']          # Сортировка ?ordering=...
     ordering = ['-date_joined']                        # Сортировка по умолчанию
 
+    pagination_class = UserFivePerPagePagination
+
     def get_queryset(self):
         queryset = User.objects.select_related('client_profile', 'engineer_profile')
         if self.request.user.role != 'admin':
@@ -69,7 +82,9 @@ class UserProfileViewSet(
             return [IsAuthenticated(), CanManageRole()]  # Только админ создаёт
         elif self.action in ['update', 'partial_update', 'destroy']:
             return [IsAuthenticated(), IsAdminOrSelf()]
-        
+        elif self.action in ['export_excel', 'export_word']:
+            return [IsAuthenticated(), CanManageRole()]
+
         return [IsAuthenticated()]
 
 
@@ -147,6 +162,68 @@ class UserProfileViewSet(
         """Получить текущий профиль пользователя"""
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='export-excel')
+    def export_excel(self, request):
+        """Экспорт отфильтрованного списка пользователей в Excel"""
+        queryset = self.filter_queryset(self.get_queryset())
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Пользователи"
+
+        ws.append(["ID", "Имя пользователя", "Email", "Роль", "Верифицирован", "Дата регистрации"])
+
+        for user in queryset:
+            date_str = user.date_joined.strftime("%Y-%m-%d %H:%M") if user.date_joined else "—"
+            ws.append([
+                user.id,
+                user.username,
+                user.email,
+                user.get_role_display(),
+                "Да" if user.is_verified else "Нет",
+                date_str,
+            ])
+
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="users_export.xlsx"'
+        wb.save(response)
+        return response
+
+    @action(detail=False, methods=['get'], url_path='export-word')
+    def export_word(self, request):
+        """Экспорт отфильтрованного списка пользователей в Word"""
+        queryset = self.filter_queryset(self.get_queryset())
+
+        doc = Document()
+        doc.add_heading('Список пользователей системы', 0)
+
+        table = doc.add_table(rows=1, cols=5)
+        table.style = 'Table Grid'
+
+        hdr_cells = table.rows[0].cells
+        hdr_cells[0].text = 'Имя пользователя'
+        hdr_cells[1].text = 'Email'
+        hdr_cells[2].text = 'Роль'
+        hdr_cells[3].text = 'Статус'
+        hdr_cells[4].text = 'Дата регистрации'
+
+        for user in queryset:
+            row_cells = table.add_row().cells
+            row_cells[0].text = str(user.username)
+            row_cells[1].text = str(user.email)
+            row_cells[2].text = str(user.get_role_display())
+            row_cells[3].text = "Верифицирован" if user.is_verified else "Ожидает"
+            row_cells[4].text = user.date_joined.strftime("%Y-%m-%d") if user.date_joined else "—"
+
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response['Content-Disposition'] = 'attachment; filename="users_export.docx"'
+        doc.save(response)
+        return response
 
 
 class ClientProfileViewSet(viewsets.ModelViewSet):
@@ -245,4 +322,3 @@ class SupportEngineerProfileViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(engineers, many=True)
         return Response(serializer.data)
-        

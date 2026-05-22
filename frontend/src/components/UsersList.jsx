@@ -1,28 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { getUsers } from "../services/user-management-api";
+import { getUsers, exportUsersExcel, exportUsersWord } from "../services/user-management-api";
 
-// Импортируем компоненты MUI
 import {
-  Container,
-  Box,
-  Typography,
-  Tabs,
-  Tab,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Avatar,
-  Chip,
-  Button,
-  CircularProgress,
-  Alert,
-  Stack
+  Box, Typography, Tabs, Tab, Paper, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow, Avatar, Chip, Button,
+  CircularProgress, Alert, Stack
 } from "@mui/material";
 
 const UsersList = () => {
@@ -32,119 +16,124 @@ const UsersList = () => {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [pagination, setPagination] = useState({ next: null, previous: null, count: 0 });
-
+  
+  const [pagination, setPagination] = useState({ next: null, previous: null, count: 0, current_page: 1 });
   const [selectedFilter, setSelectedFilter] = useState("all");
 
   const filterOptions = [
-    { value: "all", label: "Все пользователи" },
+    { value: "all", label: "Все" },
     { value: "admin", label: "Администраторы" },
     { value: "engineer", label: "Инженеры" },
     { value: "client", label: "Клиенты" },
     { value: "verified", label: "Верифицированные" },
   ];
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
+  const fetchUsers = async (url = null, pageNumber = 1) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      let responseData;
+      
+      if (url) {
+        const response = await fetch(url, {
+          headers: {
+            "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
+            "Content-Type": "application/json",
+          },
+        });
+        responseData = await response.json();
+      } else {
         const params = {};
-        if (selectedFilter === "verified") {
-          params.is_verified = true;
-        } else if (selectedFilter !== "all") {
-          params.role = selectedFilter;
-        }
+        if (selectedFilter === "verified") params.is_verified = true;
+        else if (selectedFilter !== "all") params.role = selectedFilter;
 
         const response = await getUsers(params);
-        const data = response.data;
-
-        if (data.results) {
-          setUsers(data.results);
-          setPagination({
-            next: data.next,
-            previous: data.previous,
-            count: data.count,
-          });
-        } else {
-          setUsers(Array.isArray(data) ? data : []);
-        }
-      } catch (err) {
-        console.error("Failed to load users:", err);
-        setError("Не удалось загрузить список пользователей");
-      } finally {
-        setIsLoading(false);
+        responseData = response.data;
       }
-    };
 
-    fetchUsers();
-  }, [selectedFilter]);
-
-  const handleFilterChange = (event, newValue) => {
-    setSelectedFilter(newValue);
-  };
-
-  const loadPage = async (url) => {
-    if (!url) return;
-    setIsLoading(true);
-    try {
-      const response = await fetch(url, {
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
-          "Content-Type": "application/json",
-        },
-      });
-      const data = await response.json();
-      setUsers(data.results);
-      setPagination({
-        next: data.next,
-        previous: data.previous,
-        count: data.count,
-      });
-    } catch {
-      setError("Ошибка загрузки страницы");
+      if (responseData.results) {
+        setUsers(responseData.results);
+        setPagination({
+          next: responseData.next,
+          previous: responseData.previous,
+          count: responseData.count,
+          current_page: pageNumber
+        });
+      } else {
+        setUsers(Array.isArray(responseData) ? responseData : []);
+      }
+    } catch (err) {
+      console.error("Ошибка:", err);
+      setError("Не удалось загрузить список пользователей");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getRoleLabel = (role) => {
-    const labels = {
-      admin: "Администратор",
-      engineer: "Инженер",
-      client: "Клиент",
-    };
-    return labels[role] || role;
-  };
+  useEffect(() => {
+    fetchUsers(null, 1);
+  }, [selectedFilter]);
 
-  const getRoleColor = (role) => {
-    switch (role) {
-      case "admin": return "error";
-      case "engineer": return "warning";
-      case "client": return "primary";
-      default: return "default";
+  const handleExport = async (format) => {
+    try {
+      const params = {};
+      if (selectedFilter === "verified") params.is_verified = true;
+      else if (selectedFilter !== "all") params.role = selectedFilter;
+
+      const exportFn = format === "excel" ? exportUsersExcel : exportUsersWord;
+      const response = await exportFn(params);
+
+      const extension = format === "excel" ? "xlsx" : "docx";
+      const blob = new Blob([response.data], {
+        type: response.headers["content-type"],
+      });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `users_export.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("Ошибка скачивания:", error);
+      alert("Не удалось скачать файл");
     }
   };
 
+  const getRoleLabel = (role) => ({ admin: "Администратор", engineer: "Инженер", client: "Клиент" }[role] || role);
+  const getRoleColor = (role) => ({ admin: "error", engineer: "warning", client: "primary" }[role] || "default");
+
   if (error) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-        <Button variant="contained" onClick={() => window.location.reload()}>
-          Попробовать снова
-        </Button>
-      </Container>
+      <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 4, px: 3 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+        <Button variant="contained" onClick={() => window.location.reload()}>Обновить</Button>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 8 }}>
+    <Box
+      component="main"
+      sx={{
+        width: '100%',
+        maxWidth: 1200,
+        mx: 'auto',
+        boxSizing: 'border-box',
+        px: { xs: '16px', sm: '24px', md: '32px' },
+        py: { xs: 4, sm: 5, md: 6 },
+      }}
+    >
       
-      {/* Заголовок страницы */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+      {/* 1. БЛОК ЗАГОЛОВКА С КОЛИЧЕСТВОМ */}
+      <Box 
+        display="flex" 
+        alignItems="center" 
+        gap={2} 
+        justifyContent={{ xs: 'center', sm: 'flex-start' }}
+        sx={{ mb: 2 }} /* 🔥 Минимальный отступ до кнопок скачивания */
+      >
         <Typography variant="h4" fontWeight="bold" color="#1e293b">
           Список пользователей
         </Typography>
@@ -152,135 +141,88 @@ const UsersList = () => {
           label={`Найдено: ${pagination.count || users.length}`} 
           color="default" 
           variant="outlined" 
-          sx={{ fontWeight: "bold" }}
+          sx={{ fontWeight: "bold" }} 
         />
       </Box>
 
-      {/* Панель фильтров */}
-      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 4 }}>
-        <Tabs 
-          value={selectedFilter} 
-          onChange={handleFilterChange} 
-          variant="scrollable"
-          scrollButtons="auto"
-          textColor="primary"
-          indicatorColor="primary"
+      {/* 🔥 2. ПЕРЕНЕСЕННЫЙ БЛОК КНОПОК ЭКСПОРТА (ОПУЩЕН ПОД ЗАГОЛОВОК) */}
+      {isAdmin && (
+        <Stack 
+          direction="row" 
+          spacing={2} 
+          justifyContent={{ xs: 'center', sm: 'flex-start' }}
+          sx={{ mb: 4 }} /* 🔥 Жесткий отступ вниз до вкладок-фильтров */
         >
-          {filterOptions.map((option) => (
-            <Tab 
-              key={option.value} 
-              value={option.value} 
-              label={option.label} 
-              sx={{ textTransform: "none", fontWeight: "medium", fontSize: "0.95rem" }}
-            />
+          <Button 
+            variant="outlined" 
+            color="success" 
+            onClick={() => handleExport('excel')} 
+            sx={{ flexShrink: 0, textTransform: 'none', fontWeight: 600 }}
+          >
+            Скачать Excel
+          </Button>
+          <Button 
+            variant="outlined" 
+            color="info" 
+            onClick={() => handleExport('word')} 
+            sx={{ flexShrink: 0, textTransform: 'none', fontWeight: 600 }}
+          >
+            Скачать Word
+          </Button>
+        </Stack>
+      )}
+
+      {/* 3. БЛОК ВКЛАДОК (ФИЛЬТРЫ) */}
+      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 6 }}>
+        <Tabs value={selectedFilter} onChange={(e, val) => setSelectedFilter(val)} variant="scrollable" scrollButtons="auto">
+          {filterOptions.map((opt) => (
+            <Tab key={opt.value} value={opt.value} label={opt.label} sx={{ textTransform: "none", fontWeight: "medium" }} />
           ))}
         </Tabs>
       </Box>
 
-      {/* Состояние загрузки, пустого списка или таблица */}
+      {/* 3. КОНТЕНТНАЯ ЧАСТЬ (ЗАГРУЗКА, ПУСТО ИЛИ ТАБЛИЦА) */}
       {isLoading && users.length === 0 ? (
-        <Box display="flex" flexDirection="column" alignItems="center" mt={10}>
+        <Box display="flex" flexDirection="column" alignItems="center" py={10}>
           <CircularProgress size={50} color="primary" />
-          <Typography mt={2} color="text.secondary">Загрузка пользователей...</Typography>
         </Box>
       ) : users.length === 0 ? (
         <Paper elevation={0} sx={{ p: 6, textAlign: "center", bgcolor: "#f8fafc", borderRadius: 3, border: "1px dashed #cbd5e1" }}>
-          <Typography variant="h6" color="#334155" gutterBottom>
-            Пользователи не найдены
-          </Typography>
-          <Typography color="text.secondary" mb={3}>
-            Попробуйте изменить параметры фильтрации
-          </Typography>
-          {selectedFilter !== "all" && (
-            <Button variant="outlined" onClick={() => setSelectedFilter("all")}>
-              Показать всех
-            </Button>
-          )}
+          <Typography variant="h6" color="#334155" gutterBottom>Пользователи не найдены</Typography>
         </Paper>
       ) : (
         <>
-          <TableContainer component={Paper} elevation={1} sx={{ borderRadius: 2, border: "1px solid #e2e8f0" }}>
+          <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, border: "1px solid #e2e8f0" }}>
             <Table sx={{ minWidth: 800 }}>
               <TableHead sx={{ bgcolor: "#f8fafc" }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: "bold", color: "#475569" }}>Пользователь</TableCell>
-                  <TableCell sx={{ fontWeight: "bold", color: "#475569" }}>Роль</TableCell>
-                  <TableCell sx={{ fontWeight: "bold", color: "#475569" }}>Статус</TableCell>
-                  <TableCell sx={{ fontWeight: "bold", color: "#475569" }}>Дата регистрации</TableCell>
-                  {isAdmin && <TableCell sx={{ fontWeight: "bold", color: "#475569", textAlign: "right" }}>Действия</TableCell>}
+                  <TableCell sx={{ fontWeight: "bold", color: "#475569", py: 2 }}>Пользователь</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: "#475569", py: 2 }}>Роль</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: "#475569", py: 2 }}>Статус</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: "#475569", py: 2 }}>Дата регистрации</TableCell>
+                  {isAdmin && <TableCell sx={{ fontWeight: "bold", color: "#475569", textAlign: "right", py: 2 }}>Действия</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {users.map((user) => (
-                  <TableRow key={user.id} hover sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
-                    
-                    {/* Колонка: Пользователь */}
-                    <TableCell>
+                  <TableRow key={user.id} hover>
+                    <TableCell sx={{ py: 2 }}>
                       <Box display="flex" alignItems="center" gap={2}>
-                        <Avatar sx={{ bgcolor: "primary.light", fontWeight: "bold", width: 40, height: 40 }}>
-                          {user.username ? user.username.charAt(0).toUpperCase() : "?"}
-                        </Avatar>
+                        <Avatar sx={{ bgcolor: "primary.light" }}>{user.username ? user.username.charAt(0).toUpperCase() : "?"}</Avatar>
                         <Box>
-                          <Typography variant="subtitle2" fontWeight="bold" color="#0f172a">
-                            {user.username || "Без имени"}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {user.email || "Нет email"}
-                          </Typography>
+                          <Typography variant="subtitle2" fontWeight="bold" color="#0f172a">{user.username || "Без имени"}</Typography>
+                          <Typography variant="body2" color="text.secondary">{user.email || "Нет email"}</Typography>
                         </Box>
                       </Box>
                     </TableCell>
-
-                    {/* Колонка: Роль */}
-                    <TableCell>
-                      <Chip 
-                        label={getRoleLabel(user.role)} 
-                        color={getRoleColor(user.role)} 
-                        size="small" 
-                        sx={{ fontWeight: "medium", borderRadius: 1.5 }} 
-                      />
-                    </TableCell>
-
-                    {/* Колонка: Статус */}
-                    <TableCell>
-                      {user.is_verified ? (
-                        <Chip label="Верифицирован" color="success" variant="outlined" size="small" />
-                      ) : (
-                        <Chip label="Ожидает" color="default" variant="outlined" size="small" />
-                      )}
-                    </TableCell>
-
-                    {/* Колонка: Дата регистрации */}
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {user.date_joined ? new Date(user.date_joined).toLocaleDateString("ru-RU") : "—"}
-                      </Typography>
-                    </TableCell>
-
-                    {/* Колонка: Действия (Админ) */}
+                    <TableCell><Chip label={getRoleLabel(user.role)} color={getRoleColor(user.role)} size="small" /></TableCell>
+                    <TableCell>{user.is_verified ? <Chip label="Верифицирован" color="success" variant="outlined" size="small" /> : <Chip label="Ожидает" color="default" variant="outlined" size="small" />}</TableCell>
+                    <TableCell sx={{ color: "#475569" }}>{user.date_joined ? new Date(user.date_joined).toLocaleDateString("ru-RU") : "—"}</TableCell>
                     {isAdmin && (
                       <TableCell align="right">
-                        <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          <Button 
-                            component={RouterLink} 
-                            to={`/users/${user.id}`} 
-                            variant="outlined" 
-                            size="small"
-                            color="inherit"
-                          >
-                            Профиль
-                          </Button>
-                          <Button 
-                            component={RouterLink} 
-                            to={`/users/update/${user.id}`} 
-                            variant="contained" 
-                            size="small"
-                            color="primary"
-                            disableElevation
-                          >
-                            Управление
-                          </Button>
-                        </Stack>
+                        <Button component={RouterLink} to={`/users/${user.id}`} variant="outlined" size="small">
+                          Профиль
+                        </Button>
                       </TableCell>
                     )}
                   </TableRow>
@@ -289,31 +231,41 @@ const UsersList = () => {
             </Table>
           </TableContainer>
 
-          {/* Пагинация */}
+          {/* 🔥 4. ИДЕАЛЬНО ВЫРОВНЕННАЯ ПАГИНАЦИЯ */}
           {(pagination.next || pagination.previous) && (
-            <Box display="flex" justifyContent="center" alignItems="center" gap={2} mt={4}>
-              <Button
-                variant="outlined"
-                disabled={!pagination.previous || isLoading}
-                onClick={() => loadPage(pagination.previous)}
+            <Stack 
+              direction="row" 
+              justifyContent="center" 
+              alignItems="center" 
+              spacing={3} 
+              sx={{ mt: 6 }} // 🔥 Большой отступ от таблицы
+            >
+              <Button 
+                variant="outlined" 
+                disabled={!pagination.previous || isLoading} 
+                onClick={() => fetchUsers(pagination.previous, pagination.current_page - 1)}
+                sx={{ minWidth: 120 }} // 🔥 Фиксированная ширина кнопки для идеальной симметрии
               >
                 Назад
               </Button>
-              <Typography variant="body2" color="text.secondary">
-                Страница {pagination.previous ? 2 : 1}
+              
+              <Typography variant="body1" color="text.secondary" fontWeight="bold" sx={{ minWidth: 100, textAlign: 'center' }}>
+                Страница {pagination.current_page}
               </Typography>
-              <Button
-                variant="outlined"
-                disabled={!pagination.next || isLoading}
-                onClick={() => loadPage(pagination.next)}
+              
+              <Button 
+                variant="outlined" 
+                disabled={!pagination.next || isLoading} 
+                onClick={() => fetchUsers(pagination.next, pagination.current_page + 1)}
+                sx={{ minWidth: 120 }} // 🔥 Такая же фиксированная ширина
               >
                 Вперёд
               </Button>
-            </Box>
+            </Stack>
           )}
         </>
       )}
-    </Container>
+    </Box>
   );
 };
 

@@ -242,7 +242,7 @@ const Header = () => {
               <Chip label={getRoleLabel(user.role)} size="small" color="primary" variant="outlined" sx={{ mt: 1, fontSize: '11px', height: '20px' }} />
             </Box>
             <Divider sx={{ my: 1 }} />
-            <MenuItem component={RouterLink} to={`/users/${user.id}/profile`} onClick={closeAllMenus}>
+            <MenuItem component={RouterLink} to={`/users/${user.id}/`} onClick={closeAllMenus}>
               Мой профиль
             </MenuItem>
             <MenuItem onClick={handleLogout} sx={{ color: 'error.main', fontWeight: 'bold' }}>

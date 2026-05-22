@@ -13,7 +13,15 @@ from core.serializers.comments import PartialUpdateCommentSerializer, GetComment
 from core.filters.tickets import TicketFilter
 from core.permissions import CanInteractWithTicket, IsAdminOrEngineer
 
-from core.tasks import send_ticket_created_notification, process_ai_classification_and_assignment
+from core.tasks import (
+    send_ticket_created_notification,
+    process_ai_classification_and_assignment,
+    send_change_assignee_notification,      # ← новое
+    send_remove_assignee_notification,      # ← уже есть, проверьте имя
+    send_change_status_notification,        # ← новое
+    send_set_assignee_notification,         # ← новое
+    send_resolution_approved_notification,  # ← новое
+)
 
 
 class TicketViewSet(viewsets.ModelViewSet):
@@ -85,6 +93,9 @@ class TicketViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Пользователь не является инженером поддержки'},
                             status=status.HTTP_400_BAD_REQUEST)
 
+        # 🔥 Сохраняем старого назначенного до изменения
+        old_assignee_id = ticket.assigned_engineer.user.id if ticket.assigned_engineer else None
+
         ticket.assign_engineer(engineer, assigned_by=request.user)
 
         Notification.objects.create(
@@ -92,6 +103,12 @@ class TicketViewSet(viewsets.ModelViewSet):
             message=f"Вам назначена заявка {ticket.ticket_number}",
             notification_type=Notification.Type.ASSIGNED
         )
+
+        # 🔥 Отправляем уведомление через Celery
+        transaction.on_commit(lambda: send_change_assignee_notification.delay(
+            ticket.id, old_assignee_id, engineer.user.id
+        ))
+
         return Response(self.get_serializer(ticket).data)
 
     @action(detail=False, methods=['post'], permission_classes=[IsAdminOrEngineer])
@@ -193,7 +210,6 @@ class TicketViewSet(viewsets.ModelViewSet):
         """Подтверждение решения пользователем"""
         ticket = self.get_object()
         
-        # Защита от чужих рук
         if request.user != ticket.user and request.user.role != User.Role.ADMIN:
             return Response(
                 {'error': 'Только автор заявки может подтвердить решение.'}, 
@@ -205,18 +221,25 @@ class TicketViewSet(viewsets.ModelViewSet):
                 {'error': 'Заявка не находится в статусе ожидания подтверждения (WR).'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-            
-        # Меняем статус на Решена (RS)
+        
+        old_status = ticket.status  # 🔥 Сохраняем старый статус
         ticket.status = Ticket.Status.RESOLVED
         ticket.save(update_fields=['status', 'updated_at'])
         
-        # Уведомляем инженера, что его решение принято!
         if ticket.assigned_engineer:
             Notification.objects.create(
                 user=ticket.assigned_engineer.user, ticket=ticket,
                 message=f"Пользователь подтвердил решение по заявке {ticket.ticket_number}. Отличная работа!",
                 notification_type=Notification.Type.STATUS_CHANGED
             )
+        
+        # 🔥 Уведомление об изменении статуса
+        transaction.on_commit(lambda: send_change_status_notification.delay(
+            ticket.id, old_status, Ticket.Status.RESOLVED
+        ))
+        
+        # 🔥 Уведомление об одобрении решения (отдельный таск)
+        transaction.on_commit(lambda: send_resolution_approved_notification.delay(ticket.id))
         
         return Response({'status': 'resolved', 'message': 'Решение успешно подтверждено'})
 
@@ -225,7 +248,6 @@ class TicketViewSet(viewsets.ModelViewSet):
         """Снятие инженера с заявки (Доступно только Админу)"""
         ticket = self.get_object()
         
-        # Проверка прав: только админ может снимать инженеров
         if request.user.role != User.Role.ADMIN:
             return Response(
                 {'error': 'Только администратор может снимать инженера с заявки'}, 
@@ -240,23 +262,23 @@ class TicketViewSet(viewsets.ModelViewSet):
             
         old_engineer_user = ticket.assigned_engineer.user
         
-        # Снимаем инженера и возвращаем статус "Открыта" (OP)
         ticket.assigned_engineer = None
         ticket.status = Ticket.Status.OPEN
         ticket.save(update_fields=['assigned_engineer', 'status', 'updated_at'])
         
-        # Системное уведомление внутри приложения
         Notification.objects.create(
             user=old_engineer_user, ticket=ticket,
             message=f"Администратор снял вас с выполнения заявки {ticket.ticket_number}.",
             notification_type=Notification.Type.STATUS_CHANGED
         )
         
-        # Фоновая отправка письма
-        transaction.on_commit(lambda: send_ticket_unassigned_notification.delay(ticket.id, old_engineer_user.id))
+        # 🔥 Отправляем уведомление об отмене назначения
+        transaction.on_commit(lambda: send_remove_assignee_notification.delay(
+            ticket.id, old_engineer_user.id
+        ))
         
         return Response({'status': 'unassigned', 'message': 'Инженер успешно снят с заявки'})
-
+        
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrEngineer])
     def unassign(self, request, pk=None):
         """Снятие инженера с заявки (Доступно только Админу)"""

@@ -8,6 +8,12 @@ import { apiClientInstance as apiClient } from '../api/ApiClient.jsx'
 export const getUsers = (params = {}) =>
   apiClient.get('helpdesk/users/', { params })
 
+export const exportUsersExcel = (params = {}) =>
+  apiClient.get('helpdesk/users/export-excel/', { params, responseType: 'blob' })
+
+export const exportUsersWord = (params = {}) =>
+  apiClient.get('helpdesk/users/export-word/', { params, responseType: 'blob' })
+
 // Детали пользователя
 // GET /helpdesk/users/{id}/
 export const getUserById = (id) =>
