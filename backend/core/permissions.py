@@ -45,7 +45,6 @@ class CanInteractWithTicket(permissions.BasePermission):
     """
     Универсальный пермишен для доступа к тикетам, комментариям и сессиям.
     Аналог старого HasPermissionToTicketComments.
-    Разрешает: Админу, Инженеру (назначенному ИЛИ в активной смене), Клиенту (автору).
     """
 
     def has_permission(self, request, view):
@@ -54,7 +53,8 @@ class CanInteractWithTicket(permissions.BasePermission):
 
         ticket_pk = view.kwargs.get("ticket_pk") or view.kwargs.get("pk")
         if not ticket_pk:
-            return False
+            # Для list/create пропускаем, там фильтрует get_queryset во ViewSet
+            return True 
 
         try:
             from .models import Ticket
@@ -70,24 +70,24 @@ class CanInteractWithTicket(permissions.BasePermission):
         return self._check_access(request.user, ticket)
 
     def _check_access(self, user, ticket):
-        # 1. Администратор
+        # 1. Администратор видит всё
         if user.role == "admin":
             return True
 
-        # 2. Назначенный инженер
-        if ticket.assigned_engineer_id is not None and ticket.assigned_engineer.user_id == user.id:
-            return True
-
-        # 3. Инженер в активной смене (может брать заявки, даже если ещё не назначен)
-        if user.role == "engineer":
-            try:
-                return user.engineer_profile.is_active_on_shift
-            except user.engineer_profile.RelatedObjectDoesNotExist:
-                pass
-
-        # 4. Автор заявки
+        # 2. Автор заявки всегда имеет к ней доступ
         if ticket.user_id == user.id:
             return True
+
+        # 3. Логика для Инженера
+        if user.role == "engineer":
+            # 3.1. Тикет назначен на этого инженера
+            if ticket.assigned_engineer_id is not None and ticket.assigned_engineer.user_id == user.id:
+                return True
+            
+            # 3.2. Тикет НИ НА КОГО НЕ НАЗНАЧЕН (Открыт), и инженер может его взять/просмотреть
+            from .models import Ticket
+            if ticket.assigned_engineer_id is None and ticket.status == Ticket.Status.OPEN:
+                return True
 
         return False
 

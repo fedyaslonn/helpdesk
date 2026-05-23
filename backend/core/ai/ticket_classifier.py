@@ -33,34 +33,32 @@ def build_prompt(ticket_text: str, rules: list[ClassificationRule], available_pr
     rules_txt = _render_rules_for_prompt(rules)
 
     return (
-        "You are a strict ticket classifier for a Helpdesk.\n"
-        "Your job: determine (1) priority_name and (2) resolution_minutes SLA based ONLY on provided rules.\n"
-        "If multiple rules match, choose the one with the highest business impact (prefer higher urgency).\n"
-        "If no rules match, choose the lowest urgency priority and set resolution_minutes to 1440.\n"
-        "\n"
-        f"Allowed priority_name values: [{priorities_txt}]\n"
-        "\n"
-        "Rules (admin-managed):\n"
-        f"{rules_txt if rules_txt else '(no rules)'}\n"
-        "\n"
-        "Ticket text:\n"
-        f"{ticket_text}\n"
-        "\n"
-        "Return ONLY a JSON object with this exact schema:\n"
-        '{\n'
+        "You are an IT Helpdesk classifier AI.\n"
+        "Analyze the 'Ticket text' and match it against the 'Rules'.\n\n"
+        "INSTRUCTIONS:\n"
+        "1. If the text matches a rule, use its exact 'priority_name' and 'resolution_minutes'.\n"
+        "2. If multiple rules match, choose the one with the lowest resolution_minutes (highest urgency).\n"
+        "3. If NO rules match, output priority_name: 'Низкий' and resolution_minutes: 1440.\n"
+        f"4. 'priority_name' MUST be one of: [{priorities_txt}]\n\n"
+        "RULES:\n"
+        f"{rules_txt if rules_txt else '(no rules)'}\n\n"
+        "TICKET TEXT:\n"
+        f"{ticket_text}\n\n"
+        "Return ONLY a valid JSON object. Replace the values in the schema below with your findings:\n"
+        "{\n"
         '  "priority_name": "string",\n'
-        '  "resolution_minutes": 60,\n'
+        '  "resolution_minutes": 0,\n'
         '  "confidence": 0.0,\n'
         '  "matched_phrases": ["string"],\n'
-        '  "reasoning": "short string"\n'
-        '}\n'
+        '  "reasoning": "string"\n'
+        "}\n"
     )
 
 
 def classify_ticket(ticket_text: str) -> ClassificationDecision:
     rules = list_enabled_rules()
     priorities = Priority.objects.all()
-    lowest = priorities.order_by("-level").first() or priorities.order_by("level").first()
+    lowest = priorities.order_by("level").first() 
     if not lowest:
         raise RuntimeError("No priorities configured in SQL database")
 

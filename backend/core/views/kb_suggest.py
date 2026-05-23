@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.ai.ollama_generate import generate_text
-from core.kb.elasticsearch_client import search_kb
+from core.kb.elasticsearch_client import search_kb, search_kb_db_fallback
 from core.models import KnowledgeBaseArticle, Ticket, User
 
 
@@ -67,6 +67,33 @@ class KBSuggestView(APIView):
                     "helpful_count": a.helpful_count,
                 }
             )
+
+        # Индекс ES мог устареть (старые _id без записей в БД) — ищем в PostgreSQL
+        if not articles_payload and query.strip():
+            fallback_hits = search_kb_db_fallback(
+                query, size=3, is_published_only=is_published_only
+            )
+            fallback_ids = [h["id"] for h in fallback_hits]
+            articles_by_id = {
+                a.id: a
+                for a in KnowledgeBaseArticle.objects.select_related("category")
+                .filter(id__in=fallback_ids)
+            }
+            for h in fallback_hits:
+                a = articles_by_id.get(h["id"])
+                if not a:
+                    continue
+                articles_payload.append(
+                    {
+                        "id": a.id,
+                        "title": a.title,
+                        "category_name": a.category.name if a.category_id else None,
+                        "score": h["score"],
+                        "excerpt": _excerpt(a.content),
+                        "content": a.content,
+                        "helpful_count": a.helpful_count,
+                    }
+                )
 
         draft = None
         top_article_id = articles_payload[0]["id"] if articles_payload else None

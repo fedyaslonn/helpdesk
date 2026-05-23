@@ -8,8 +8,10 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import strip_tags
 from datetime import timedelta
-from .kb.elasticsearch_client import delete_article, index_article
+from .kb.elasticsearch_client import build_kb_document, delete_article, index_article
 from core.models import KnowledgeBaseArticle, Ticket
+
+from django.db import transaction
 
 from core.ai.ticket_classifier import classify_ticket
 import time
@@ -26,10 +28,17 @@ User = get_user_model()
 @shared_task
 def process_ai_classification_and_assignment(ticket_id):
     """Фоновая задача для обработки тикета нейросетью и авто-назначения"""
+    
+    # ⏱ Стартуем таймер для метрики DURATION
+    start_time = time.time()
+    
+    # 📊 Метрика: инкрементируем счетчик начатых задач
+    AI_CLASSIFICATION_REQUESTS.labels(status="started").inc()
+
     try:
         ticket = Ticket.objects.get(id=ticket_id)
         
-        # 1. Запускаем Ollama
+        # 1. Запускаем Ollama / Классификатор
         decision = classify_ticket(ticket.description)
         
         # Обновляем приоритет и SLA
@@ -37,6 +46,10 @@ def process_ai_classification_and_assignment(ticket_id):
         if decision.resolution_minutes:
             ticket.sla_deadline = ticket.created_at + timedelta(minutes=decision.resolution_minutes)
         ticket.save(update_fields=['priority', 'sla_deadline', 'updated_at'])
+
+        # 📊 Метрика: записываем, какой приоритет выдала система
+        priority_name = ticket.priority.name if ticket.priority else "Unknown"
+        AI_PRIORITY_ASSIGNED.labels(priority=priority_name).inc()
 
         # 2. Теперь, когда у нас есть приоритет, делаем авто-назначение
         with transaction.atomic():
@@ -51,9 +64,18 @@ def process_ai_classification_and_assignment(ticket_id):
                 notification_type=Notification.Type.ASSIGNED
             )
             
+        # 📊 Метрика: задача выполнена успешно
+        AI_CLASSIFICATION_REQUESTS.labels(status="success").inc()
+            
     except Exception as e:
-        # Если что-то пошло не так (например, БД недоступна), просто пишем в логи Celery
+        # 📊 Метрика: произошла ошибка
+        AI_CLASSIFICATION_REQUESTS.labels(status="error").inc()
         print(f"Ошибка в фоновой классификации тикета {ticket_id}: {str(e)}")
+        
+    finally:
+        # ⏱ В самом конце (даже если была ошибка) останавливаем таймер и пишем в гистограмму
+        duration = time.time() - start_time
+        AI_CLASSIFICATION_DURATION.observe(duration)
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=2)
 def index_kb_article_task(self, article_id: int):
@@ -68,16 +90,7 @@ def index_kb_article_task(self, article_id: int):
             .get(pk=article_id)
         )
 
-        doc = {
-            "title": article.title,
-            "content": article.content,
-            "category_name": article.category.name if article.category_id else "",
-            "category_id": article.category_id,
-            "tags": [t.strip() for t in (article.tags or "").split(",") if t.strip()],
-            "is_published": bool(article.is_published),
-            "updated_at": article.updated_at.isoformat() if article.updated_at else None,
-        }
-        index_article(article_id=article.id, doc=doc)
+        index_article(article_id=article.id, doc=build_kb_document(article))
     except KnowledgeBaseArticle.DoesNotExist:
         # если статью удалили до таски — удаляем из индекса
         delete_article(article_id=article_id)
@@ -372,25 +385,3 @@ def send_resolution_approved_notification(self, ticket_id):
             f"Failed to send resolution notification for {ticket_id}: {str(e)}"
         )
         self.retry(exc=e, countdown=2**self.request.retries)
-
-@shared_task(bind=True, max_retries=3)
-def process_ai_classification_and_assignment(self, ticket_id):
-    try:
-        ticket = Ticket.objects.get(id=ticket_id)
-        
-        # 1. Засекаем время работы ИИ
-        start_time = time.time()
-        decision = classify_ticket(ticket.description)
-        duration = time.time() - start_time
-        
-        # Записываем метрики ИИ
-        AI_CLASSIFICATION_DURATION.observe(duration)
-        AI_CLASSIFICATION_REQUESTS.labels(status=decision.source).inc() # 'ollama' или 'fallback'
-        AI_PRIORITY_ASSIGNED.labels(priority=decision.priority.name).inc()
-
-        # ... (здесь твой код сохранения приоритета и SLA из прошлого ответа) ...
-        
-    except Exception as e:
-        # Если всё сломалось, тоже фиксируем метрику
-        AI_CLASSIFICATION_REQUESTS.labels(status='error').inc()
-        print(f"Ошибка классификации: {e}")

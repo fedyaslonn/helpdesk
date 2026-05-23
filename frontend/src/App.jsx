@@ -68,11 +68,11 @@ function App() {
                 {/* 🔥 ВОТ СЮДА НУЖНО ВСТАВИТЬ МЕТРИКИ! 🔥 */}
                 <Route path="api/metrics" element={<SystemMetrics />} />
                 
-                <Route path="kb-articles">
-                  <Route index element={<KBList />} /> 
-                  <Route path="create" element={<KBArticleCreate />} /> 
-                  <Route path=":id" element={<KBDetail />} /> 
-                </Route>
+<Route path="kb-articles">
+    <Route index element={<KBList />} /> 
+    <Route path="create" element={<KBArticleCreate />} /> 
+    <Route path=":id" element={<KBDetail />} />  {/* 👈 Полный путь получается: /helpdesk/kb-articles/1 */}
+  </Route>
 
                 <Route path="tickets">
                   <Route index element={<TicketsPage />} />

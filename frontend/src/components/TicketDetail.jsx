@@ -6,7 +6,7 @@ import {
   deleteTicket, 
   autoAssignTicket, 
   assignTicket, 
-  unassignTicket, // 🔥 Импортировали новый метод
+  unassignTicket,
   closeTicket, 
   updateTicket,
   getEngineers,
@@ -106,7 +106,12 @@ const TicketDetail = () => {
       if (!ticket) return;
       const isAdmin = currentUser?.role === 'admin';
       const isEngineer = currentUser?.role === 'engineer';
-      const isAssignee = ticket.assignee?.id === currentUser?.id;
+      
+      // 🔥 ИСПРАВЛЕНИЕ 1: Правильное обращение к полю assigned_engineer
+      const isAssignee = 
+        ticket.assigned_engineer?.user?.id === currentUser?.id || 
+        ticket.assigned_engineer?.id === currentUser?.id;
+
       if (!(isAdmin || (isEngineer && isAssignee))) return;
 
       setKbLoading(true);
@@ -173,7 +178,6 @@ const TicketDetail = () => {
     }
   };
 
-  // 🔥 Обработчик снятия инженера
   const handleUnassign = async () => {
     setActionError(null);
     if (!window.confirm("Снять текущего инженера с заявки? Заявка снова станет Открытой (OP).")) return;
@@ -233,7 +237,11 @@ const TicketDetail = () => {
   const isAdmin = currentUser?.role === 'admin';
   const isEngineer = currentUser?.role === 'engineer';
   const isAuthor = ticket.requestor?.id === currentUser?.id;
-  const isAssignee = ticket.assignee?.id === currentUser?.id;
+  
+  // 🔥 ИСПРАВЛЕНИЕ 2: Права текущего пользователя как назначенного инженера
+  const isAssignee = 
+    ticket.assigned_engineer?.user?.id === currentUser?.id || 
+    ticket.assigned_engineer?.id === currentUser?.id;
 
   const canDelete = isAdmin;
   const canAssign = isAdmin || isEngineer;
@@ -282,7 +290,10 @@ const TicketDetail = () => {
                 </Box>
                 <Box sx={{ flex: '1 1 45%' }}>
                   <Typography variant="caption" color="text.secondary" fontSize="0.9rem">Назначенный инженер</Typography>
-                  <Typography variant="body1" fontWeight="bold" fontSize="1.1rem">{ticket.assignee?.username || 'Не назначен'}</Typography>
+                  {/* 🔥 ИСПРАВЛЕНИЕ 3: Вывод имени инженера */}
+                  <Typography variant="body1" fontWeight="bold" fontSize="1.1rem">
+                    {ticket.assigned_engineer?.user?.username || ticket.assigned_engineer?.username || 'Не назначен'}
+                  </Typography>
                 </Box>
                 <Box sx={{ flex: '1 1 100%' }}>
                   <Typography variant="caption" color="text.secondary" fontSize="0.9rem">Категория проблемы</Typography>
@@ -471,8 +482,8 @@ const TicketDetail = () => {
                       Назначить
                     </Button>
 
-                    {/* 🔥 НОВАЯ КНОПКА СНЯТИЯ ИНЖЕНЕРА */}
-                    {ticket.assignee && isAdmin && (
+                    {/* 🔥 ИСПРАВЛЕНИЕ 4: Проверка assigned_engineer перед снятием */}
+                    {ticket.assigned_engineer && isAdmin && (
                       <Button 
                         variant="outlined" 
                         color="error" 
@@ -551,7 +562,8 @@ const TicketDetail = () => {
         />
       </Box>
       <Box mt={4}>
-        <TicketSessions ticketId={ticket.id} assigneeId={ticket.assignee?.id} />
+        {/* 🔥 ИСПРАВЛЕНИЕ 5: Проброс правильного ID инженера */}
+        <TicketSessions ticketId={ticket.id} assigneeId={ticket.assigned_engineer?.id} />
       </Box>
       <Box mt={4}>
         <TicketComments ticketId={ticket.id} />

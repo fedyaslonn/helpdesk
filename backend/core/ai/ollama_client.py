@@ -41,7 +41,7 @@ def _extract_json_object(text: str) -> dict[str, Any]:
 def classify_with_ollama(prompt: str) -> OllamaResult:
     base_url = _env("OLLAMA_BASE_URL", "http://ollama:11434")
     model = _env("OLLAMA_MODEL", "llama3")
-    timeout_s = float(_env("OLLAMA_TIMEOUT_SECONDS", "120") or 120)
+    timeout_s = float(_env("OLLAMA_TIMEOUT_SECONDS", "300") or 300)
 
     if not base_url or not model:
         raise RuntimeError("OLLAMA_BASE_URL / OLLAMA_MODEL is not set")
@@ -74,6 +74,9 @@ def classify_with_ollama(prompt: str) -> OllamaResult:
 
     outer = json.loads(raw)
     response_text = str(outer.get("response") or "").strip()
+
+    print(f"\n--- СЫРОЙ ОТВЕТ OLLAMA ---\n{response_text}\n--------------------------\n")
+
     if not response_text:
         raise RuntimeError("Empty response from Ollama")
 

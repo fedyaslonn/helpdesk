@@ -126,7 +126,7 @@ const KBList = () => {
                   bgcolor: 'background.paper',
                 }}
               >
-                <CardActionArea onClick={() => navigate(`/helpdesk/kb/${article.id}`)} sx={{ p: { xs: 3, sm: 4 } }}> {/* 🔥 Сделал карточки "пухлее" внутри */}
+                <CardActionArea onClick={() => navigate(`/helpdesk/kb-articles/${article.id}`)} sx={{ p: { xs: 3, sm: 4 } }}>
                   <Box display="flex" alignItems="center" gap={1.5} mb={2}> {/* 🔥 Отдалил заголовок от текста (mb={2}) */}
                     {!article.is_published && (
                       <Chip label="Черновик" color="warning" size="small" variant="outlined" />

@@ -352,7 +352,7 @@ const TicketsPage = () => {
       </Box>
 
       {/* СЕКЦИЯ 1: Мои обращения */}
-      <Box mb={30}> {/* 🔥 ИЗМЕНЕНИЕ: Сильно увеличил mb (margin-bottom) до 15. Это создаст огромный пустой отступ вниз перед следующим блоком */}
+      <Box mb={8}> 
         <Box display="flex" alignItems="center" gap={2} mb={3}> 
           <Typography variant="h5" fontWeight="bold" color="#334155">
             Мои обращения
@@ -373,7 +373,7 @@ const TicketsPage = () => {
 
       {/* СЕКЦИЯ 2: В моей работе */}
       {currentUser?.role !== 'client' && (
-        <Box mb={6}>
+        <Box mb={8}>
           <Box display="flex" alignItems="center" gap={2} mb={3}> 
             <Typography variant="h5" fontWeight="bold" color="#334155">
               В моей работе
@@ -388,6 +388,28 @@ const TicketsPage = () => {
           ) : (
             <Typography color="text.secondary" sx={{ bgcolor: '#f1f5f9', p: 4, borderRadius: 2, maxWidth: 500, textAlign: 'center' }}> 
               У вас пока нет назначенных заявок.
+            </Typography>
+          )}
+        </Box>
+      )}
+
+      {/* 🔥 СЕКЦИЯ 3: Все заявки платформы (ТОЛЬКО ДЛЯ АДМИНА) 🔥 */}
+      {currentUser?.role === 'admin' && (
+        <Box mb={8}>
+          <Box display="flex" alignItems="center" gap={2} mb={3}> 
+            <Typography variant="h5" fontWeight="bold" color="#7c3aed"> {/* Фиолетовый акцент для админки */}
+              Все заявки системы (Панель Администратора)
+            </Typography>
+            <Badge badgeContent={tickets.length} color="error" sx={{ ml: 1 }} />
+          </Box>
+          
+          {tickets.length > 0 ? (
+            <Box sx={horizontalScrollStyles}>
+              {tickets.map(renderTicketCard)}
+            </Box>
+          ) : (
+            <Typography color="text.secondary" sx={{ bgcolor: '#f1f5f9', p: 4, borderRadius: 2, maxWidth: 500, textAlign: 'center' }}> 
+              В системе пока нет заявок.
             </Typography>
           )}
         </Box>

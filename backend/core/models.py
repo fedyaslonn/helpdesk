@@ -312,8 +312,6 @@ class Ticket(TimestampedModel):
         if not self.ticket_number:
             self.ticket_number = f"TK-{uuid.uuid4().hex[:8].upper()}"
         
-        if is_new and not getattr(self, 'sla_deadline', None):
-            self._calculate_sla_deadline()
         
         super().save(*args, **kwargs)
 
@@ -326,8 +324,11 @@ class Ticket(TimestampedModel):
             category=self.category
         ).first()
         if sla:
-            self.sla_deadline = self.created_at + timedelta(minutes=sla.resolution_time_min)
-
+            # 🔥 ИСПРАВЛЕНИЕ: Если заявка только создается и created_at еще None, 
+            # используем текущее время (timezone.now())
+            from django.utils import timezone
+            base_time = self.created_at or timezone.now()
+            self.sla_deadline = base_time + timedelta(minutes=sla.resolution_time_min)
     def assign_engineer(self, engineer: SupportEngineer, assigned_by: User):
         """Ручное назначение инженера (доступно Админу и Инженеру)"""
         if not assigned_by.can_assign_tickets():
