@@ -8,9 +8,9 @@ import {
   changeUserRole, 
   verifyUser 
 } from "../services/user-management-api";
+import { PageLayout, PageHeader, ButtonGroup } from './ui';
 
 import {
-  Container,
   Box,
   Typography,
   TextField,
@@ -149,15 +149,15 @@ function UserUpdate() {
 
   if (!user) {
     return (
-      <Container maxWidth="md" sx={{ mt: 10 }}>
+      <PageLayout maxWidth="max-w-3xl">
         <Alert severity="error">{error}</Alert>
         <Button variant="outlined" sx={{ mt: 2 }} onClick={() => navigate(-1)}>Вернуться назад</Button>
-      </Container>
+      </PageLayout>
     );
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 8, mb: 8 }}>
+    <PageLayout maxWidth="max-w-3xl">
       
       <Box display="flex" alignItems="center" gap={2} mb={4}>
         <Button variant="outlined" color="inherit" onClick={() => navigate("/users")}>
@@ -296,7 +296,7 @@ function UserUpdate() {
           </Stack>
         </Paper>
       )}
-    </Container>
+    </PageLayout>
   );
 }
 

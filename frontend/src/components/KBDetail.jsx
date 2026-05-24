@@ -2,24 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { getKBArticleDetails, deleteKBArticle, voteKBArticle } from '../services/ticket-management-api';
-
+import { PageLayout, PageHeader, LoadingState } from './ui';
 import {
-  Container,
   Box,
   Typography,
   Button,
   Paper,
-  CircularProgress,
   Chip,
   Stack,
-  Divider
+  Divider,
 } from '@mui/material';
 
 const KBDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const [article, setArticle] = useState(null);
   const [voted, setVoted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,8 +29,7 @@ const KBDetail = () => {
         const response = await getKBArticleDetails(id);
         setArticle(response.data);
       } catch (err) {
-        alert("Статья не найдена");
-        // 🔥 Исправлен путь на kb-articles
+        alert('Статья не найдена');
         navigate('/helpdesk/kb-articles');
       } finally {
         setIsLoading(false);
@@ -42,13 +39,12 @@ const KBDetail = () => {
   }, [id, navigate]);
 
   const handleDelete = async () => {
-    if (!window.confirm("Вы уверены, что хотите удалить эту статью навсегда?")) return;
+    if (!window.confirm('Вы уверены, что хотите удалить эту статью навсегда?')) return;
     try {
       await deleteKBArticle(id);
-      // 🔥 Исправлен путь на kb-articles
       navigate('/helpdesk/kb-articles');
     } catch (err) {
-      alert("Ошибка при удалении статьи");
+      alert('Ошибка при удалении статьи');
     }
   };
 
@@ -56,19 +52,18 @@ const KBDetail = () => {
     if (voted) return;
     try {
       const response = await voteKBArticle(id, { helpful: true });
-      setArticle(prev => ({ ...prev, helpful_count: response.data.helpful_count }));
+      setArticle((prev) => ({ ...prev, helpful_count: response.data.helpful_count }));
       setVoted(true);
     } catch (err) {
-      alert("Ошибка при сохранении оценки");
+      alert('Ошибка при сохранении оценки');
     }
   };
 
   if (isLoading) {
     return (
-      <Box display="flex" flexDirection="column" alignItems="center" mt={10}>
-        <CircularProgress color="primary" />
-        <Typography mt={2} color="text.secondary">Загрузка статьи...</Typography>
-      </Box>
+      <PageLayout maxWidth="max-w-3xl">
+        <LoadingState message="Загрузка статьи…" />
+      </PageLayout>
     );
   }
 
@@ -77,99 +72,71 @@ const KBDetail = () => {
   const canEdit = user?.role === 'admin' || user?.id === article.author;
 
   return (
-    <Container maxWidth="md" sx={{ mt: { xs: 4, md: 8 }, mb: 10 }}> {/* 🔥 Увеличил отступы всей страницы от краев экрана */}
-      <Button 
-        variant="outlined" 
-        color="inherit" 
-        size="small" 
+    <PageLayout maxWidth="max-w-3xl">
+      <Button
+        variant="outlined"
+        color="inherit"
+        size="small"
         onClick={() => navigate('/helpdesk/kb-articles')}
-        sx={{ mb: 5 }} /* 🔥 Увеличил отступ от кнопки "Назад" до самой статьи */
+        className="!mb-4"
       >
         ← Назад к списку
       </Button>
 
-      <Paper elevation={0} sx={{ p: { xs: 4, md: 6 }, border: '1px solid #e2e8f0', borderRadius: 3 }}> {/* 🔥 Увеличил внутренний padding (p) карточки */}
-        
-        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={4} flexWrap="wrap" gap={3}> {/* 🔥 Отступ от заголовка до тегов */}
-          <Typography variant="h4" fontWeight="bold" color="#0f172a" sx={{ flex: 1, minWidth: '300px', lineHeight: 1.3 }}>
-            {article.title}
-          </Typography>
-          {canEdit && (
-            <Button variant="outlined" color="error" size="small" onClick={handleDelete}>
-              Удалить статью
-            </Button>
-          )}
-        </Box>
+      <Paper elevation={0} className="hd-card !p-6 md:!p-8">
+        <PageHeader
+          title={article.title}
+          actions={
+            canEdit ? (
+              <Button variant="outlined" color="error" size="small" onClick={handleDelete}>
+                Удалить
+              </Button>
+            ) : null
+          }
+        />
 
-        <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap sx={{ mb: 6, pb: 4, borderBottom: '1px solid #e2e8f0' }}> {/* 🔥 Увеличил spacing между чипами и отступы mb/pb */}
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap className="!mb-6 !border-b !border-slate-200 !pb-4">
           <Chip label={`Автор: ${article.author_name || 'Неизвестен'}`} size="small" variant="outlined" />
           <Chip label={`Опубликовано: ${new Date(article.created_at).toLocaleDateString('ru-RU')}`} size="small" variant="outlined" />
           <Chip label={`Просмотров: ${article.view_count}`} size="small" variant="outlined" />
-          {!article.is_published && (
-            <Chip label="Скрытый черновик" size="small" color="warning" sx={{ fontWeight: 'bold' }} />
-          )}
+          {!article.is_published && <Chip label="Черновик" size="small" color="warning" />}
         </Stack>
 
-        <Typography 
-          variant="body1" 
-          sx={{ 
-            fontSize: '1.15rem', // 🔥 Чуть увеличил шрифт для удобства чтения
-            lineHeight: 1.9,     // 🔥 Добавил межстрочный интервал (воздух внутри текста)
-            color: '#334155', 
-            whiteSpace: 'pre-wrap', 
-            mb: 7                // 🔥 Огромный отступ от основного текста до тегов
-          }}
-        >
+        <Typography variant="body1" className="!mb-8 !whitespace-pre-wrap !leading-relaxed text-slate-700">
           {article.content}
         </Typography>
 
         {article.tags && (
-          <Box mb={6}> {/* 🔥 Увеличил отступ от тегов до разделительной линии */}
-            <Typography variant="subtitle2" fontWeight="bold" color="text.secondary" mb={2} textTransform="uppercase">
+          <Box className="mb-6">
+            <Typography variant="subtitle2" fontWeight={700} color="text.secondary" className="!mb-2">
               Теги
             </Typography>
-            <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
-              {article.tags.split(',').map(t => (
-                <Chip 
-                  key={t} 
-                  label={`#${t.trim()}`} 
-                  size="medium" // 🔥 Сделал теги чуть крупнее
-                  sx={{ bgcolor: '#f1f5f9', color: '#475569', fontWeight: 'medium' }} 
-                />
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              {article.tags.split(',').map((t) => (
+                <Chip key={t} label={`#${t.trim()}`} size="small" />
               ))}
             </Stack>
           </Box>
         )}
 
-        <Divider sx={{ mb: 5 }} /> {/* 🔥 Увеличил отступ вокруг Divider */}
+        <Divider className="!mb-6" />
 
-        {/* Блок голосования */}
-        <Box sx={{ bgcolor: '#f8fafc', p: 5, borderRadius: 3, textAlign: 'center', border: '1px solid #e2e8f0' }}> {/* 🔥 Увеличил padding в блоке голосования */}
-          <Typography variant="h5" fontWeight="bold" color="#0f172a" mb={3}> {/* 🔥 Сделал текст вопроса крупнее и отодвинул кнопку */}
+        <Box className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center">
+          <Typography variant="h6" fontWeight={700} className="!mb-4">
             Статья была полезна?
           </Typography>
-          <Button 
-            variant={voted ? "contained" : "outlined"}
-            color="success" 
+          <Button
+            variant={voted ? 'contained' : 'outlined'}
+            color="success"
             size="large"
-            onClick={handleVote} 
+            onClick={handleVote}
             disabled={voted}
-            disableElevation
-            sx={{ 
-              fontWeight: 'bold', 
-              px: 5, 
-              py: 1.5,
-              fontSize: '1.1rem', // 🔥 Увеличил кнопку
-              borderWidth: voted ? 0 : 2,
-              '&:hover': { borderWidth: voted ? 0 : 2 }
-            }}
           >
-            {voted ? `Спасибо за оценку! (${article.helpful_count})` : `Да, помогло (${article.helpful_count})`}
+            {voted ? `Спасибо! (${article.helpful_count})` : `Да, помогло (${article.helpful_count})`}
           </Button>
         </Box>
-
       </Paper>
-    </Container>
+    </PageLayout>
   );
 };
 

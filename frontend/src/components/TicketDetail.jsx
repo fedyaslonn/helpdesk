@@ -18,9 +18,9 @@ import {
 import TicketResolution from "./TicketResolution";
 import TicketSessions from "./TicketSessions";
 import TicketComments from "./TicketComments";
+import { PageLayout, ButtonGroup } from "./ui";
 
 import {
-  Container,
   Box,
   Typography,
   Button,
@@ -34,10 +34,6 @@ import {
   Stack,
   Alert,
   Snackbar,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction
 } from "@mui/material";
 
 const getStatusChip = (status) => {
@@ -250,24 +246,17 @@ const TicketDetail = () => {
   const canClose = (isAuthor || isAssignee || isAdmin) && ['RS', 'WR'].includes(ticket.status);
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
-      
+    <PageLayout maxWidth="max-w-6xl">
       {actionError && <Alert severity="error" sx={{ mb: 3 }}>{actionError}</Alert>}
 
-      {/* ШАПКА ЗАЯВКИ */}
-      <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 5, pb: 2, borderBottom: '1px solid #e2e8f0' }}>
-        <Button 
-          variant="outlined" 
-          color="inherit" 
-          size="small" 
-          onClick={() => navigate('/helpdesk/tickets')}
-          sx={{ position: 'absolute', left: 0 }}
-        >
-          Назад
+      <Box className="mb-6 flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <Button variant="outlined" color="inherit" size="small" onClick={() => navigate('/helpdesk/tickets')} className="!self-start">
+          ← Назад к заявкам
         </Button>
-        <Typography variant="h4" fontWeight="bold" color="#1e293b" sx={{ m: 0, textAlign: 'center' }}>
+        <Typography variant="h4" fontWeight="bold" className="!text-center sm:!flex-1">
           Заявка {ticket.ticket_number}
         </Typography>
+        <Box className="hidden w-[100px] sm:block" aria-hidden />
       </Box>
 
       {/* ОСНОВНОЙ КОНТЕНТ */}
@@ -379,36 +368,33 @@ const TicketDetail = () => {
                   )}
 
                   {!kbLoading && (kbSuggest?.articles?.length > 0) ? (
-                    <List dense sx={{ p: 0 }}>
+                    <Stack spacing={2}>
                       {kbSuggest.articles.map((a) => (
-                        <ListItem key={a.id} sx={{ px: 0 }}>
-                          <ListItemText
-                            primary={
-                              <Typography fontWeight={700} variant="body2" noWrap title={a.title}>
-                                {a.title}
-                              </Typography>
-                            }
-                            secondary={
-                              <Typography variant="caption" color="text.secondary" noWrap title={a.excerpt}>
-                                {a.category_name ? `${a.category_name} • ` : ''}{a.excerpt}
-                              </Typography>
-                            }
-                          />
-                          <ListItemSecondaryAction>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <Chip label={Math.round((a.score || 0) * 10) / 10} size="small" />
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                onClick={() => attachTextAsResolution(a.content, a.id)}
-                              >
-                                Прикрепить
-                              </Button>
-                            </Stack>
-                          </ListItemSecondaryAction>
-                        </ListItem>
+                        <Box
+                          key={a.id}
+                          className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 sm:flex-row sm:items-center"
+                        >
+                          <Box className="min-w-0 flex-1">
+                            <Typography fontWeight={700} variant="body2" title={a.title}>
+                              {a.title}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" className="!mt-1 !block">
+                              {a.category_name ? `${a.category_name} • ` : ''}{a.excerpt}
+                            </Typography>
+                          </Box>
+                          <ButtonGroup>
+                            <Chip label={Math.round((a.score || 0) * 10) / 10} size="small" />
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={() => attachTextAsResolution(a.content, a.id)}
+                            >
+                              Прикрепить
+                            </Button>
+                          </ButtonGroup>
+                        </Box>
                       ))}
-                    </List>
+                    </Stack>
                   ) : (
                     !kbLoading && !kbError && (
                       <Typography variant="body2" color="text.secondary">
@@ -459,11 +445,10 @@ const TicketDetail = () => {
                     Назначение инженера
                   </Typography>
                   
-                  <Button variant="contained" color="primary" size="large" fullWidth sx={{ mb: 4 }} onClick={handleAutoAssign} disableElevation>
-                    Авто-назначение
-                  </Button>
-                  
-                  <Box display="flex" flexDirection="column">
+                  <Stack spacing={2}>
+                    <Button variant="contained" color="primary" size="large" fullWidth onClick={handleAutoAssign}>
+                      Авто-назначение
+                    </Button>
                     <TextField
                       select
                       size="small"
@@ -471,7 +456,7 @@ const TicketDetail = () => {
                       value={selectedEngineer}
                       onChange={(e) => setSelectedEngineer(e.target.value)}
                       fullWidth
-                      sx={{ bgcolor: 'white', mb: 2.5 }} 
+                      sx={{ bgcolor: 'white' }}
                     >
                       <MenuItem value=""><em>Не выбран</em></MenuItem>
                       {engineers.map(eng => (
@@ -481,21 +466,12 @@ const TicketDetail = () => {
                     <Button variant="outlined" color="primary" size="large" fullWidth onClick={handleManualAssign} disabled={!selectedEngineer}>
                       Назначить
                     </Button>
-
-                    {/* 🔥 ИСПРАВЛЕНИЕ 4: Проверка assigned_engineer перед снятием */}
                     {ticket.assigned_engineer && isAdmin && (
-                      <Button 
-                        variant="outlined" 
-                        color="error" 
-                        size="large" 
-                        fullWidth 
-                        onClick={handleUnassign} 
-                        sx={{ mt: 2 }}
-                      >
+                      <Button variant="outlined" color="error" size="large" fullWidth onClick={handleUnassign}>
                         Снять инженера
                       </Button>
                     )}
-                  </Box>
+                  </Stack>
                 </CardContent>
               </Card>
             )}
@@ -585,7 +561,7 @@ const TicketDetail = () => {
         </Alert>
       </Snackbar>
 
-    </Container>
+    </PageLayout>
   );
 };
 

@@ -2,7 +2,8 @@ import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useAuth } from "../auth/AuthContext"
 import { getTicketDetails, updateTicket } from "../services/ticket-management-api" // ✅ Исправлен импорт
-import "../styles/TicketUpdate.css"
+import { PageLayout, PageHeader, ButtonGroup, LoadingState } from './ui';
+import { Box, Typography, TextField, Button, Paper, Alert, Stack } from '@mui/material';
 
 const EditTicket = () => {
   const { id } = useParams()
@@ -139,78 +140,65 @@ const EditTicket = () => {
   }
 
   if (isLoading) {
-    return <div className="edit-ticket-container"><div className="loading-spinner">Загрузка...</div></div>
+    return (
+      <PageLayout maxWidth="max-w-xl">
+        <LoadingState message="Загрузка заявки…" />
+      </PageLayout>
+    );
   }
 
   if (error) {
     return (
-      <div className="edit-ticket-container">
-        <div className="error-message">
-          <h3>{error.title}</h3>
-          <p>{error.message}</p>
-          <button className="btn btn-primary" onClick={() => navigate("/helpdesk/tickets")}>Назад к заявкам</button>
-        </div>
-      </div>
-    )
+      <PageLayout maxWidth="max-w-xl">
+        <Alert severity="error" sx={{ mb: 2 }}>{error.message}</Alert>
+        <Button variant="contained" onClick={() => navigate('/helpdesk/tickets')}>Назад к заявкам</Button>
+      </PageLayout>
+    );
   }
 
   if (!canEditTicket()) {
     return (
-      <div className="edit-ticket-container">
-        <div className="error-message">
-          <h3>Нет доступа</h3>
-          <p>Только автор может редактировать эту заявку.</p>
-          <button className="btn btn-primary" onClick={() => navigate(`/helpdesk/tickets/${id}`)}>Вернуться к заявке</button>
-        </div>
-      </div>
-    )
+      <PageLayout maxWidth="max-w-xl">
+        <Alert severity="warning" sx={{ mb: 2 }}>Только автор может редактировать эту заявку.</Alert>
+        <Button variant="contained" onClick={() => navigate(`/helpdesk/tickets/${id}`)}>Вернуться к заявке</Button>
+      </PageLayout>
+    );
   }
 
   return (
-    <div className="edit-ticket-container">
-      <div className="edit-header">
-        <h1>Редактирование заявки #{ticket.ticket_number}</h1>
-      </div>
+    <PageLayout maxWidth="max-w-xl">
+      <Paper elevation={0} className="hd-card !p-6">
+        <PageHeader title={`Редактирование ${ticket.ticket_number}`} subtitle="Измените описание проблемы" />
 
-      <div className="edit-form-card">
-        <form onSubmit={handleSubmit} className="edit-form">
-          
-          <div className="form-group">
-            <label htmlFor="description">
-              Описание проблемы
-            </label>
-            <textarea
-              id="description"
+        <Box component="form" onSubmit={handleSubmit}>
+          <Stack spacing={3}>
+            <TextField
+              label="Описание проблемы"
               name="description"
               value={formData.description}
               onChange={handleInputChange}
               onBlur={handleBlur}
-              className={`form-control ${formErrors.description ? "is-invalid" : ""}`}
-              placeholder="Подробно опишите проблему..."
-              disabled={isSubmitting}
+              multiline
               rows={8}
+              fullWidth
+              required
+              error={Boolean(formErrors.description)}
+              helperText={formErrors.description}
+              disabled={isSubmitting}
             />
-            {formErrors.description && (
-              <span className="field-error-inline">{formErrors.description}</span>
-            )}
-          </div>
-
-          <div className="form-actions">
-            <button type="button" className="btn btn-secondary" onClick={handleCancel} disabled={isSubmitting}>
-              Отмена
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isSubmitting || !hasChanges()}
-            >
-              {isSubmitting ? "Сохранение..." : "Сохранить изменения"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
+            <ButtonGroup>
+              <Button type="button" variant="outlined" color="inherit" onClick={handleCancel} disabled={isSubmitting}>
+                Отмена
+              </Button>
+              <Button type="submit" variant="contained" disabled={isSubmitting || !hasChanges()}>
+                {isSubmitting ? 'Сохранение…' : 'Сохранить'}
+              </Button>
+            </ButtonGroup>
+          </Stack>
+        </Box>
+      </Paper>
+    </PageLayout>
+  );
 }
 
 export default EditTicket

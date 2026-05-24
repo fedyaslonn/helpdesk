@@ -3,6 +3,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { getUsers, exportUsersExcel, exportUsersWord } from "../services/user-management-api";
 
+import { PageLayout, PageHeader, ButtonGroup } from './ui';
 import {
   Box, Typography, Tabs, Tab, Paper, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Avatar, Chip, Button,
@@ -114,63 +115,23 @@ const UsersList = () => {
   }
 
   return (
-    <Box
-      component="main"
-      sx={{
-        width: '100%',
-        maxWidth: 1200,
-        mx: 'auto',
-        boxSizing: 'border-box',
-        px: { xs: '16px', sm: '24px', md: '32px' },
-        py: { xs: 4, sm: 5, md: 6 },
-      }}
-    >
-      
-      {/* 1. БЛОК ЗАГОЛОВКА С КОЛИЧЕСТВОМ */}
-      <Box 
-        display="flex" 
-        alignItems="center" 
-        gap={2} 
-        justifyContent={{ xs: 'center', sm: 'flex-start' }}
-        sx={{ mb: 2 }} /* 🔥 Минимальный отступ до кнопок скачивания */
-      >
-        <Typography variant="h4" fontWeight="bold" color="#1e293b">
-          Список пользователей
-        </Typography>
-        <Chip 
-          label={`Найдено: ${pagination.count || users.length}`} 
-          color="default" 
-          variant="outlined" 
-          sx={{ fontWeight: "bold" }} 
-        />
-      </Box>
-
-      {/* 🔥 2. ПЕРЕНЕСЕННЫЙ БЛОК КНОПОК ЭКСПОРТА (ОПУЩЕН ПОД ЗАГОЛОВОК) */}
-      {isAdmin && (
-        <Stack 
-          direction="row" 
-          spacing={2} 
-          justifyContent={{ xs: 'center', sm: 'flex-start' }}
-          sx={{ mb: 4 }} /* 🔥 Жесткий отступ вниз до вкладок-фильтров */
-        >
-          <Button 
-            variant="outlined" 
-            color="success" 
-            onClick={() => handleExport('excel')} 
-            sx={{ flexShrink: 0, textTransform: 'none', fontWeight: 600 }}
-          >
-            Скачать Excel
-          </Button>
-          <Button 
-            variant="outlined" 
-            color="info" 
-            onClick={() => handleExport('word')} 
-            sx={{ flexShrink: 0, textTransform: 'none', fontWeight: 600 }}
-          >
-            Скачать Word
-          </Button>
-        </Stack>
-      )}
+    <PageLayout maxWidth="max-w-6xl">
+      <PageHeader
+        title="Список пользователей"
+        subtitle={`Найдено: ${pagination.count || users.length}`}
+        actions={
+          isAdmin ? (
+            <ButtonGroup>
+              <Button variant="outlined" color="success" onClick={() => handleExport('excel')}>
+                Скачать Excel
+              </Button>
+              <Button variant="outlined" color="info" onClick={() => handleExport('word')}>
+                Скачать Word
+              </Button>
+            </ButtonGroup>
+          ) : null
+        }
+      />
 
       {/* 3. БЛОК ВКЛАДОК (ФИЛЬТРЫ) */}
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 6 }}>
@@ -265,7 +226,7 @@ const UsersList = () => {
           )}
         </>
       )}
-    </Box>
+    </PageLayout>
   );
 };
 

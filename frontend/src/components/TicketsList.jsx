@@ -3,8 +3,8 @@ import { useAuth } from '../auth/AuthContext';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getTickets, getCategories, createTicket } from '../services/ticket-management-api';
 
+import { PageLayout, PageHeader, LoadingState } from './ui';
 import {
-  Container,
   Box,
   Typography,
   Button,
@@ -306,28 +306,33 @@ const TicketsPage = () => {
 
   if (isLoading && tickets.length === 0) {
     return (
-      <Box display="flex" flexDirection="column" alignItems="center" mt={10}>
-        <CircularProgress size={50} color="primary" />
-        <Typography mt={2} color="text.secondary">Загрузка заявок...</Typography>
-      </Box>
+      <PageLayout maxWidth="max-w-[1400px]">
+        <LoadingState message="Загрузка заявок…" />
+      </PageLayout>
     );
   }
-  
-  if (error) return <Alert severity="error" sx={{ m: 4 }}>{error}</Alert>;
+
+  if (error) {
+    return (
+      <PageLayout maxWidth="max-w-[1400px]">
+        <Alert severity="error">{error}</Alert>
+      </PageLayout>
+    );
+  }
 
   return (
-    <Container maxWidth="xl" sx={{ mt: { xs: 4, md: 6 }, mb: 10 }}> 
+    <PageLayout maxWidth="max-w-[1400px]" className="!pb-16">
       <CreateTicketModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={fetchTickets} />
 
-      {/* Заголовок и кнопка создания */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={5}> 
-        <Typography variant="h4" fontWeight="bold" color="#1e293b">
-          Заявки
-        </Typography>
-        <Button variant="contained" color="primary" onClick={() => setIsModalOpen(true)} sx={{ boxShadow: 2, px: 4, py: 1.2 }}> 
-          + Новая заявка
-        </Button>
-      </Box>
+      <PageHeader
+        title="Заявки"
+        subtitle="Управление обращениями и отслеживание статусов"
+        actions={
+          <Button variant="contained" color="primary" onClick={() => setIsModalOpen(true)}>
+            + Новая заявка
+          </Button>
+        }
+      />
 
       {/* Панель фильтров (Tabs) */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 6 }}> 
@@ -415,7 +420,7 @@ const TicketsPage = () => {
         </Box>
       )}
 
-    </Container>
+    </PageLayout>
   );
 };
 

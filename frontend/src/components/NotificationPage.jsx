@@ -1,17 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  getNotifications, 
-  markAllNotificationsRead, 
-  markNotificationRead, 
-  deleteNotification 
+import {
+  getNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  deleteNotification,
 } from '../services/ticket-management-api';
+import { PageLayout, PageHeader, ButtonGroup, LoadingState, EmptyState } from './ui';
+import {
+  Box,
+  Button,
+  IconButton,
+  MenuItem,
+  Paper,
+  Select,
+  Typography,
+} from '@mui/material';
 
 const NotificationsPage = () => {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState('all'); // 'all' или 'unread'
+  const [filter, setFilter] = useState('all');
 
   const fetchNotifications = async () => {
     setIsLoading(true);
@@ -20,7 +30,7 @@ const NotificationsPage = () => {
       const response = await getNotifications(params);
       setNotifications(response.data.results || response.data);
     } catch (err) {
-      console.error("Ошибка загрузки уведомлений", err);
+      console.error('Ошибка загрузки уведомлений', err);
     } finally {
       setIsLoading(false);
     }
@@ -30,126 +40,109 @@ const NotificationsPage = () => {
     fetchNotifications();
   }, [filter]);
 
-  // --- ОБРАБОТЧИКИ ---
-
   const handleMarkAllRead = async () => {
     try {
       await markAllNotificationsRead();
-      // Локально обновляем стейт, чтобы не делать лишний запрос
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     } catch (err) {
-      alert("Ошибка при обновлении");
+      alert('Ошибка при обновлении');
     }
   };
 
   const handleMarkRead = async (id) => {
     try {
       await markNotificationRead(id);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
     } catch (err) {
       console.error(err);
     }
   };
 
   const handleDelete = async (id, e) => {
-    e.stopPropagation(); // Чтобы при клике на удаление не сработал переход в заявку
+    e.stopPropagation();
     try {
       await deleteNotification(id);
-      setNotifications(prev => prev.filter(n => n.id !== id));
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
     } catch (err) {
-      alert("Ошибка при удалении");
+      alert('Ошибка при удалении');
     }
   };
 
   const handleNotificationClick = (notification) => {
-    // Отмечаем прочитанным при клике
     if (!notification.is_read) {
       handleMarkRead(notification.id);
     }
-    // Если уведомление привязано к заявке — переходим в нее
     if (notification.ticket) {
       navigate(`/helpdesk/tickets/${notification.ticket}`);
     }
   };
 
-  // --- РЕНДЕР ---
-  
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
-    <div style={{ maxWidth: '800px', margin: '30px auto', padding: '0 20px' }}>
-      
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0 }}>Уведомления {unreadCount > 0 && <span style={{ background: '#ef4444', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '14px' }}>{unreadCount}</span>}</h2>
-        
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <select 
-            className="form-control" 
-            value={filter} 
-            onChange={(e) => setFilter(e.target.value)}
-            style={{ width: 'auto' }}
-          >
-            <option value="all">Все</option>
-            <option value="unread">Только непрочитанные</option>
-          </select>
-
-          {unreadCount > 0 && (
-            <button className="btn btn-secondary" onClick={handleMarkAllRead}>
-              ✓ Прочитать все
-            </button>
-          )}
-        </div>
-      </div>
+    <PageLayout maxWidth="max-w-3xl">
+      <PageHeader
+        title="Уведомления"
+        subtitle={unreadCount > 0 ? `${unreadCount} непрочитанных` : 'Все прочитаны'}
+        actions={
+          <ButtonGroup>
+            <Select
+              size="small"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="!min-w-[180px]"
+            >
+              <MenuItem value="all">Все</MenuItem>
+              <MenuItem value="unread">Только непрочитанные</MenuItem>
+            </Select>
+            {unreadCount > 0 && (
+              <Button variant="outlined" onClick={handleMarkAllRead}>
+                Прочитать все
+              </Button>
+            )}
+          </ButtonGroup>
+        }
+      />
 
       {isLoading ? (
-        <div className="spinner"></div>
+        <LoadingState message="Загрузка уведомлений…" />
+      ) : notifications.length === 0 ? (
+        <EmptyState title="Нет уведомлений" description="Здесь появятся обновления по вашим заявкам." />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {notifications.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', background: '#f8fafc', borderRadius: '8px', color: '#94a3b8' }}>
-              Нет новых уведомлений
-            </div>
-          ) : (
-            notifications.map(notification => (
-              <div 
-                key={notification.id} 
-                onClick={() => handleNotificationClick(notification)}
-                style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  padding: '15px 20px', 
-                  background: notification.is_read ? '#fff' : '#f0fdfa', 
-                  borderLeft: notification.is_read ? '4px solid transparent' : '4px solid #0d9488',
-                  borderRadius: '8px', 
-                  border: '1px solid #e2e8f0',
-                  cursor: 'pointer',
-                  transition: 'background 0.2s'
-                }}
-              >
-                <div>
-                  <p style={{ margin: '0 0 5px 0', color: '#0f172a', fontWeight: notification.is_read ? 'normal' : 'bold' }}>
+        <Box className="flex flex-col gap-3">
+          {notifications.map((notification) => (
+            <Paper
+              key={notification.id}
+              elevation={0}
+              onClick={() => handleNotificationClick(notification)}
+              className={`hd-card cursor-pointer !p-4 transition-colors hover:bg-slate-50 ${
+                !notification.is_read ? '!border-l-4 !border-l-teal-500 bg-teal-50/50' : ''
+              }`}
+            >
+              <Box className="flex items-start justify-between gap-3">
+                <Box className="min-w-0 flex-1">
+                  <Typography fontWeight={notification.is_read ? 400 : 700}>
                     {notification.message}
-                  </p>
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>
-                    {new Date(notification.created_at).toLocaleString()} 
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" className="!mt-1 !block">
+                    {new Date(notification.created_at).toLocaleString()}
                     {notification.ticket && ` • Заявка #${notification.ticket}`}
-                  </span>
-                </div>
-
-                <button 
-                  className="btn btn-sm btn-light" 
+                  </Typography>
+                </Box>
+                <IconButton
+                  size="small"
+                  color="error"
                   onClick={(e) => handleDelete(notification.id, e)}
-                  style={{ color: '#ef4444', border: 'none', background: 'transparent', fontSize: '16px' }}
+                  aria-label="удалить"
                 >
                   ✕
-                </button>
-              </div>
-            ))
-          )}
-        </div>
+                </IconButton>
+              </Box>
+            </Paper>
+          ))}
+        </Box>
       )}
-    </div>
+    </PageLayout>
   );
 };
 

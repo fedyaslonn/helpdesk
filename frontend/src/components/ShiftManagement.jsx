@@ -4,9 +4,10 @@ import {
   getShifts, createShift, updateShift, deleteShift, getTodayShifts, getEngineers 
 } from '../services/ticket-management-api';
 
+import { PageLayout, PageHeader, LoadingState } from './ui';
 import {
-  Container, Box, Typography, Tabs, Tab, Paper, Table, TableBody, TableCell, 
-  TableContainer, TableHead, TableRow, Button, TextField, Checkbox, 
+  Box, Typography, Tabs, Tab, Paper, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Button, TextField, Checkbox,
   FormControlLabel, MenuItem, CircularProgress, Alert, Chip, Grid, Stack
 } from '@mui/material';
 
@@ -78,18 +79,15 @@ const ShiftManagement = () => {
 
   if (isLoading) {
     return (
-      <Box display="flex" flexDirection="column" alignItems="center" mt={10}>
-        <CircularProgress size={40} />
-        <Typography mt={2} color="text.secondary">Загрузка расписания...</Typography>
-      </Box>
+      <PageLayout>
+        <LoadingState message="Загрузка расписания…" />
+      </PageLayout>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 6, mb: 8 }}>
-      <Typography variant="h4" fontWeight="bold" color="#1e293b" mb={4}>
-        Расписание смен
-      </Typography>
+    <PageLayout maxWidth="max-w-5xl">
+      <PageHeader title="Расписание смен" subtitle="График дежурств инженеров" />
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
         <Tabs value={activeTab} onChange={handleTabChange}>
@@ -210,7 +208,7 @@ const ShiftManagement = () => {
           </TableContainer>
         </>
       )}
-    </Container>
+    </PageLayout>
   );
 };
 

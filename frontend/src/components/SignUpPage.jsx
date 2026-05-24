@@ -1,12 +1,8 @@
-// src/components/SignUpPage.jsx
 import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { registerUser } from '../services/user-management-api';
-import { message } from 'antd'; 
-
 import {
-  Container,
   Box,
   Typography,
   TextField,
@@ -14,27 +10,29 @@ import {
   Paper,
   Alert,
   Link,
-  CircularProgress
+  CircularProgress,
+  Snackbar,
 } from '@mui/material';
 
 export default function SignUpPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  
+
   const [form, setForm] = useState({
     username: '',
     email: '',
     password: '',
     password2: '',
   });
-  
+
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
 
   const handleChange = (e) => {
-    setForm(prev => ({
+    setForm((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     }));
   };
 
@@ -52,10 +50,8 @@ export default function SignUpPage() {
       });
 
       await login(form.username, form.password);
-
-      message.success('Регистрация успешна!');
+      setSuccessMsg('Регистрация успешна!');
       navigate('/helpdesk/tickets');
-
     } catch (err) {
       const errors = err.response?.data;
       if (errors?.email) setError(errors.email[0]);
@@ -64,119 +60,39 @@ export default function SignUpPage() {
       else if (errors?.password_confirm) setError(errors.password_confirm[0]);
       else if (errors?.detail) setError(errors.detail);
       else setError('Ошибка регистрации. Попробуйте позже.');
-
-      message.error('Регистрация не удалась');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Paper 
-        elevation={6} 
-        sx={{ 
-          mt: 8, 
-          p: 4, 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center',
-          borderRadius: 3 
-        }}
-      >
-        <Typography component="h1" variant="h5" sx={{ mb: 3, fontWeight: 'bold', color: '#1e293b' }}>
+    <div className="flex min-h-screen items-center justify-center bg-hd-page px-4 py-12">
+      <Paper elevation={0} className="hd-card w-full max-w-md p-8">
+        <Typography component="h1" variant="h5" fontWeight={700} className="!mb-6 !text-center">
           Регистрация
         </Typography>
 
-        {error && (
-          <Alert severity="error" sx={{ width: '100%', mb: 2, borderRadius: 2 }}>
-            {error}
-          </Alert>
-        )}
+        {error && <Alert severity="error" className="!mb-4">{error}</Alert>}
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            id="username"
-            label="Имя пользователя"
-            name="username"
-            autoComplete="username"
-            autoFocus
-            value={form.username}
-            onChange={handleChange}
-            disabled={loading}
-          />
+        <Box component="form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <TextField required fullWidth name="username" label="Имя пользователя" value={form.username} onChange={handleChange} disabled={loading} autoFocus />
+          <TextField required fullWidth name="email" label="Электронная почта" type="email" value={form.email} onChange={handleChange} disabled={loading} />
+          <TextField required fullWidth name="password" label="Пароль" type="password" value={form.password} onChange={handleChange} disabled={loading} />
+          <TextField required fullWidth name="password2" label="Подтвердите пароль" type="password" value={form.password2} onChange={handleChange} disabled={loading} />
 
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            id="email"
-            label="Электронная почта"
-            name="email"
-            type="email"
-            autoComplete="email"
-            value={form.email}
-            onChange={handleChange}
-            disabled={loading}
-          />
-
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            name="password"
-            label="Пароль"
-            type="password"
-            id="password"
-            autoComplete="new-password"
-            value={form.password}
-            onChange={handleChange}
-            disabled={loading}
-          />
-
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            name="password2"
-            label="Подтвердите пароль"
-            type="password"
-            id="password2"
-            value={form.password2}
-            onChange={handleChange}
-            disabled={loading}
-          />
-
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            color="primary" // MUI сам подхватит наш фиолетовый цвет из темы!
-            disabled={loading}
-            sx={{ 
-              mt: 4, 
-              mb: 2, 
-              py: 1.5, 
-              fontSize: '1rem',
-              boxShadow: 3,
-              '&:hover': {
-                boxShadow: 6, // Красивая тень при наведении
-              }
-            }}
-          >
+          <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} className="!mt-2">
             {loading ? <CircularProgress size={26} color="inherit" /> : 'Зарегистрироваться'}
           </Button>
 
-          <Box textAlign="center" sx={{ mt: 1 }}>
-            <Link component={RouterLink} to="/login" variant="body2" sx={{ textDecoration: 'none', color: 'primary.main' }}>
+          <Box className="text-center">
+            <Link component={RouterLink} to="/login" variant="body2">
               Уже есть аккаунт? Войти
             </Link>
           </Box>
         </Box>
       </Paper>
-    </Container>
+
+      <Snackbar open={Boolean(successMsg)} autoHideDuration={3000} onClose={() => setSuccessMsg('')} message={successMsg} />
+    </div>
   );
 }

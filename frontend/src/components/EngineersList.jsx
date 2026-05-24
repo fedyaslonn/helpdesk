@@ -3,8 +3,8 @@ import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { getEngineerProfiles, toggleEngineerDuty } from "../services/user-management-api";
 
+import { PageLayout, PageHeader } from './ui';
 import {
-  Container,
   Box,
   Typography,
   Tabs,
@@ -74,27 +74,15 @@ function EngineersList() {
 
   if (error) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 10 }}>
+      <PageLayout>
         <Alert severity="error">{error}</Alert>
-      </Container>
+      </PageLayout>
     );
   }
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 8, mb: 8 }}>
-      
-      {/* Заголовок */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={5}>
-        <Typography variant="h4" fontWeight="bold" color="#1e293b">
-          Инженеры поддержки
-        </Typography>
-        <Chip 
-          label={`Всего: ${engineers.length}`} 
-          color="default" 
-          variant="outlined" 
-          sx={{ fontWeight: "bold" }}
-        />
-      </Box>
+    <PageLayout maxWidth="max-w-6xl">
+      <PageHeader title="Инженеры поддержки" subtitle={`Всего: ${engineers.length}`} />
 
       {/* Фильтры */}
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 4 }}>
@@ -219,7 +207,7 @@ function EngineersList() {
           </Table>
         </TableContainer>
       )}
-    </Container>
+    </PageLayout>
   );
 }
 

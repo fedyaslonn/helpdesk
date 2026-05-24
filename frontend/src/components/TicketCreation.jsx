@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from "../auth/AuthContext";
 import { getCategories, createTicket } from '../services/ticket-management-api';
 
+import { PageLayout, PageHeader, ButtonGroup } from './ui';
 import {
   Box, Typography, TextField, Button, Paper,
   Alert, CircularProgress, MenuItem, Stack
@@ -74,30 +75,9 @@ const TicketCreateForm = () => {
   }
 
   return (
-    <Box
-      component="main"
-      sx={{
-        width: '100%',
-        maxWidth: 560,
-        mx: 'auto',
-        boxSizing: 'border-box',
-        px: { xs: '16px', sm: '24px', md: '32px' },
-        py: { xs: 3, sm: 4, md: 5 },
-        mb: { xs: 4, sm: 6 },
-      }}
-    >
-      <Paper
-        elevation={0}
-        sx={{
-          p: { xs: 3, sm: 4, md: 5 },
-          border: '1px solid #e2e8f0',
-          borderRadius: 3,
-          bgcolor: 'background.paper',
-        }}
-      >
-        <Typography variant="h4" fontWeight="bold" color="#1e293b" mb={3}>
-          Новая заявка
-        </Typography>
+    <PageLayout maxWidth="max-w-xl">
+      <Paper elevation={0} className="hd-card !p-6 md:!p-8">
+        <PageHeader title="Новая заявка" subtitle="Опишите проблему и выберите категорию" />
 
         {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
@@ -132,20 +112,17 @@ const TicketCreateForm = () => {
             />
           </Stack>
 
-          <Button
-            type="submit"
-            variant="contained"
-            color="primary"
-            size="large"
-            fullWidth
-            disabled={isSubmitting}
-            sx={{ fontWeight: 'bold', py: 1.5 }}
-          >
-            {isSubmitting ? 'Создание...' : 'Создать заявку'}
-          </Button>
+          <ButtonGroup vertical className="!mt-2">
+            <Button type="submit" variant="contained" size="large" fullWidth disabled={isSubmitting}>
+              {isSubmitting ? 'Создание…' : 'Создать заявку'}
+            </Button>
+            <Button variant="outlined" color="inherit" fullWidth onClick={() => navigate('/helpdesk/tickets')}>
+              Отмена
+            </Button>
+          </ButtonGroup>
         </Box>
       </Paper>
-    </Box>
+    </PageLayout>
   );
 };
 

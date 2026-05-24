@@ -3,8 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { getCurrentUser, getUserById, updateUser } from "../services/user-management-api";
 
+import { PageLayout } from './ui';
 import {
-  Container,
   Box,
   Typography,
   Card,
@@ -178,10 +178,10 @@ const UserProfile = () => {
 
   if (error && !user) {
     return (
-      <Container maxWidth="md" sx={{ mt: 10 }}>
+      <PageLayout maxWidth="max-w-3xl">
         <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>
         <Button variant="outlined" onClick={() => navigate(-1)}>Вернуться назад</Button>
-      </Container>
+      </PageLayout>
     );
   }
 
@@ -191,7 +191,7 @@ const UserProfile = () => {
   const canEdit = isMyProfile || authUser?.role === "admin";
 
   return (
-    <Container maxWidth="md" sx={{ mt: 8, mb: 8 }}>
+    <PageLayout maxWidth="max-w-3xl">
       
       {/* Уведомления */}
       {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
@@ -411,7 +411,7 @@ const UserProfile = () => {
 
         </CardContent>
       </Card>
-    </Container>
+    </PageLayout>
   );
 };
 

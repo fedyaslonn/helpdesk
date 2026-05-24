@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { getPriorities, createPriority, updatePriority, deletePriority } from '../services/ticket-management-api';
 
+import { PageLayout, PageHeader } from './ui';
 import {
-  Container, Box, Typography, TextField, Button, Paper, 
+  Box, Typography, TextField, Button, Paper,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Alert, CircularProgress, Stack, Chip
 } from '@mui/material';
@@ -97,18 +98,8 @@ const PrioritiesPage = () => {
   }
 
   return (
-    <Container
-      maxWidth="md"
-      sx={{
-        mt: { xs: 3, sm: 5 },
-        mb: { xs: 6, sm: 8 },
-        px: { xs: 2, sm: 3 },
-        py: { xs: 1, sm: 0 },
-      }}
-    >
-      <Typography variant="h4" fontWeight="bold" color="#1e293b" mb={{ xs: 3, sm: 4 }} sx={{ px: { xs: 0.5, sm: 0 } }}>
-        Справочник приоритетов
-      </Typography>
+    <PageLayout maxWidth="max-w-3xl">
+      <PageHeader title="Справочник приоритетов" subtitle="Уровни приоритета для заявок" />
 
       {error && <Alert severity="error" sx={{ mb: 3, mx: { xs: 0.5, sm: 0 } }}>{error}</Alert>}
 
@@ -225,7 +216,7 @@ const PrioritiesPage = () => {
           </Table>
         </TableContainer>
       )}
-    </Container>
+    </PageLayout>
   );
 };
 

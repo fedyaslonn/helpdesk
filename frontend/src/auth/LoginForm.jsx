@@ -1,10 +1,7 @@
-// src/components/LoginForm.jsx
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-
 import {
-  Container,
   Box,
   Typography,
   TextField,
@@ -12,7 +9,7 @@ import {
   Paper,
   Alert,
   Link,
-  CircularProgress
+  CircularProgress,
 } from '@mui/material';
 
 export default function LoginForm() {
@@ -20,7 +17,7 @@ export default function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
@@ -47,31 +44,31 @@ export default function LoginForm() {
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Paper 
-        elevation={6} 
-        sx={{ 
-          mt: 8, 
-          p: 4, 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center',
-          borderRadius: 3 
-        }}
+    <div className="flex min-h-screen items-center justify-center bg-hd-page px-4 py-12">
+      <Paper
+        elevation={0}
+        className="hd-card w-full max-w-md p-8"
       >
-        <Typography component="h1" variant="h5" sx={{ mb: 3, fontWeight: 'bold', color: '#1e293b' }}>
-          Вход в систему
-        </Typography>
+        <Box className="mb-6 text-center">
+          <Typography component="span" className="text-3xl" aria-hidden>
+            🛠️
+          </Typography>
+          <Typography component="h1" variant="h5" fontWeight={700} className="!mt-2">
+            Вход в HelpDesk
+          </Typography>
+          <Typography variant="body2" color="text.secondary" className="!mt-1">
+            Служба поддержки
+          </Typography>
+        </Box>
 
         {error && (
-          <Alert severity="error" sx={{ width: '100%', mb: 2, borderRadius: 2 }}>
+          <Alert severity="error" className="!mb-4">
             {error}
           </Alert>
         )}
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
+        <Box component="form" onSubmit={handleSubmit} className="flex flex-col gap-4">
           <TextField
-            margin="normal"
             required
             fullWidth
             id="username"
@@ -84,7 +81,6 @@ export default function LoginForm() {
             disabled={loading}
           />
           <TextField
-            margin="normal"
             required
             fullWidth
             name="password"
@@ -96,34 +92,26 @@ export default function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
             disabled={loading}
           />
-          
+
           <Button
             type="submit"
             fullWidth
             variant="contained"
-            color="primary" // Подхватывает фиолетовый из App.jsx
+            color="primary"
             disabled={loading}
-            sx={{ 
-              mt: 4, 
-              mb: 2, 
-              py: 1.5, 
-              fontSize: '1rem',
-              boxShadow: 3,
-              '&:hover': {
-                boxShadow: 6,
-              }
-            }}
+            size="large"
+            className="!mt-2"
           >
             {loading ? <CircularProgress size={26} color="inherit" /> : 'Войти'}
           </Button>
 
-          <Box textAlign="center" sx={{ mt: 1 }}>
-            <Link component={RouterLink} to="/signup" variant="body2" sx={{ textDecoration: 'none', color: 'primary.main' }}>
+          <Box className="text-center">
+            <Link component={RouterLink} to="/signup" variant="body2">
               Нет аккаунта? Зарегистрироваться
             </Link>
           </Box>
         </Box>
       </Paper>
-    </Container>
+    </div>
   );
 }

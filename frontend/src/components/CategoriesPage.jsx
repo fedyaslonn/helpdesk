@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../services/ticket-management-api';
 
+import { PageLayout, PageHeader, LoadingState } from './ui';
 import {
   Box, Typography, Button, Paper, CircularProgress, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Stack
@@ -166,41 +167,18 @@ const CategoriesPage = () => {
   }
 
   return (
-    <Box
-      component="main"
-      sx={{
-        width: '100%',
-        maxWidth: 900,
-        mx: 'auto',
-        boxSizing: 'border-box',
-        px: { xs: '16px', sm: '24px', md: '32px' },
-        py: { xs: 3, sm: 4, md: 5 },
-        mb: { xs: 4, sm: 6 },
-      }}
-    >
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems={{ xs: 'stretch', sm: 'center' }}
-        flexDirection={{ xs: 'column', sm: 'row' }}
-        gap={2}
-        mb={{ xs: 3, sm: 4 }}
-        textAlign={{ xs: 'center', sm: 'left' }}
-      >
-        <Typography variant="h4" fontWeight="bold" color="#1e293b" sx={{ alignSelf: { xs: 'center', sm: 'auto' } }}>
-          Справочник категорий
-        </Typography>
-        {isAdmin && (
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => openModal()}
-            sx={{ alignSelf: { xs: 'center', sm: 'auto' }, flexShrink: 0 }}
-          >
-            Добавить категорию
-          </Button>
-        )}
-      </Box>
+    <PageLayout maxWidth="max-w-4xl">
+      <PageHeader
+        title="Справочник категорий"
+        subtitle="Иерархия категорий для заявок"
+        actions={
+          isAdmin ? (
+            <Button variant="contained" onClick={() => openModal()}>
+              Добавить категорию
+            </Button>
+          ) : null
+        }
+      />
 
       {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
@@ -281,7 +259,7 @@ const CategoriesPage = () => {
           </DialogActions>
         </Box>
       </Dialog>
-    </Box>
+    </PageLayout>
   );
 };
 

@@ -1,3 +1,44 @@
+/* Tailwind v4 — без preflight (MUI CssBaseline) */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme {
+  --color-hd-primary: #7c3aed;
+  --color-hd-primary-dark: #5b21b6;
+  --color-hd-primary-light: #a78bfa;
+  --color-hd-danger: #dc2626;
+  --color-hd-success: #059669;
+  --color-hd-surface: #ffffff;
+  --color-hd-page: #f1f5f9;
+  --color-hd-muted: #64748b;
+  --color-hd-text: #0f172a;
+  --color-hd-border: #e2e8f0;
+  --radius-hd: 8px;
+}
+
+@layer components {
+  .hd-page {
+    @apply min-h-full bg-hd-page text-hd-text;
+  }
+
+  .hd-card {
+    @apply rounded-lg border border-hd-border bg-hd-surface shadow-sm;
+  }
+
+  .hd-sidebar-link {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-violet-50 hover:text-hd-primary;
+  }
+
+  .hd-sidebar-link-active {
+    @apply bg-violet-100 font-semibold text-hd-primary;
+  }
+
+  .hd-sidebar-section {
+    @apply mb-1 px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400;
+  }
+}
+
 /* HelpDesk — глобальная вёрстка и общие UI-классы (кнопки, поля, спиннеры) */
 
 :root {

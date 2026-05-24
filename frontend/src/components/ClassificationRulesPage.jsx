@@ -8,6 +8,7 @@ import {
   deleteClassificationRule,
   getPriorities,
 } from '../services/ticket-management-api';
+import { PageLayout, PageHeader } from './ui';
 
 import {
   Alert,
@@ -184,25 +185,11 @@ const ClassificationRulesPage = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4, pb: 10 }}>
-      <Stack direction="row" alignItems="center" spacing={1.5} mb={1}>
-        <Typography
-          component="span"
-          sx={{ fontSize: 32, lineHeight: 1 }}
-          aria-hidden
-        >
-          ✨
-        </Typography>
-        <Box>
-          <Typography variant="h4" fontWeight={800} color="text.primary" letterSpacing={-0.5}>
-            Правила авто-классификации
-          </Typography>
-          <Typography variant="body2" color="text.secondary" maxWidth={720}>
-            Ключевые фразы и SLA для Ollama: при создании заявки модель сопоставляет текст с этими
-            правилами и выставляет приоритет и дедлайн.
-          </Typography>
-        </Box>
-      </Stack>
+    <PageLayout maxWidth="max-w-5xl">
+      <PageHeader
+        title="Правила авто-классификации"
+        subtitle="Ключевые фразы и SLA для Ollama: при создании заявки модель сопоставляет текст с правилами и выставляет приоритет."
+      />
 
       <Paper
         elevation={0}
@@ -430,7 +417,7 @@ const ClassificationRulesPage = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Container>
+    </PageLayout>
   );
 };
 
