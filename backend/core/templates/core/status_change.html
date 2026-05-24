@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Status Update: {{ ticket.title }}</title>
+    <title>Обновление статуса: {{ ticket.ticket_number }}</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -147,7 +147,7 @@
         }
 
         .arrow-icon {
-            font-size: 28px;
+            font-size: 20px;
             color: #81c784;
             z-index: 2;
             background: white;
@@ -324,23 +324,23 @@
 <body>
     <div class="email-container">
         <div class="header">
-            <h1>Status Update: {{ ticket.title }}</h1>
-            <p>Task status has been updated in {{ ticket.organization.name }}</p>
+            <h1>Обновление статуса: {{ ticket.ticket_number }}</h1>
+            <p>Статус заявки в категории «{{ ticket.category.name }}» был изменен</p>
         </div>
 
         <div class="status-change-card">
-            <div class="status-change-title">Task Status Update</div>
+            <div class="status-change-title">Изменение статуса заявки</div>
 
             <div class="status-container">
                 <div class="status-item from-status">
-                    <div class="status-label">Previous Status</div>
+                    <div class="status-label">Предыдущий статус</div>
                     <div class="status-value">{{ old_status }}</div>
                 </div>
 
-                <div class="arrow-icon">→</div>
+                <div class="arrow-icon">➔</div>
 
                 <div class="status-item to-status">
-                    <div class="status-label">Current Status</div>
+                    <div class="status-label">Новый статус</div>
                     <div class="status-value">{{ new_status }}</div>
                 </div>
             </div>
@@ -348,25 +348,25 @@
 
         <div class="task-details">
             <div class="detail-row">
-                <div class="detail-icon">📋</div>
+                <div class="detail-icon">📌</div>
                 <div class="detail-content">
-                    <div class="detail-label">Task Title</div>
-                    <div class="detail-value">{{ ticket.title }}</div>
+                    <div class="detail-label">Номер заявки</div>
+                    <div class="detail-value">{{ ticket.ticket_number }}</div>
                 </div>
             </div>
 
             <div class="detail-row">
-                <div class="detail-icon">🏢</div>
+                <div class="detail-icon">📁</div>
                 <div class="detail-content">
-                    <div class="detail-label">Organization</div>
-                    <div class="detail-value">{{ ticket.organization.name }}</div>
+                    <div class="detail-label">Категория</div>
+                    <div class="detail-value">{{ ticket.category.name }}</div>
                 </div>
             </div>
 
             <div class="detail-row">
                 <div class="detail-icon">📝</div>
                 <div class="detail-content">
-                    <div class="detail-label">Description</div>
+                    <div class="detail-label">Описание</div>
                     <div class="detail-value">{{ ticket.description|truncatewords:30 }}</div>
                 </div>
             </div>
@@ -374,22 +374,31 @@
             <div class="detail-row">
                 <div class="detail-icon">👤</div>
                 <div class="detail-content">
-                    <div class="detail-label">Assignee</div>
+                    <div class="detail-label">Назначенный инженер</div>
                     <div class="detail-value">
-                        {% if ticket.assignee %}
+                        {% if ticket.assigned_engineer %}
                             <div class="assignee-container">
-                                <div class="assignee-avatar">{{ ticket.assignee.username|first|upper }}</div>
-                                <div>{{ ticket.assignee.username }}</div>
+                                <div class="assignee-avatar">{{ ticket.assigned_engineer.user.username|first|upper }}</div>
+                                <div>{{ ticket.assigned_engineer.user.username }}</div>
                             </div>
                         {% else %}
                             <div class="assignee-container">
                                 <div class="assignee-avatar unassigned">!</div>
-                                <div>Unassigned</div>
+                                <div>Не назначен</div>
                             </div>
                         {% endif %}
                     </div>
                 </div>
             </div>
+        </div>
+
+        <div class="action-section">
+            <a href="http://localhost:3000/helpdesk/tickets/{{ ticket.id }}" class="btn">Открыть заявку</a>
+        </div>
+
+        <div class="footer">
+            <p>Это автоматическое уведомление от системы Helpdesk.</p>
+            <p>Пожалуйста, не отвечайте на это письмо.</p>
         </div>
 
     </div>

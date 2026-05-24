@@ -142,26 +142,28 @@ def send_ticket_resolved_notification(self, resolution_id):
         logger.error(f"Failed to send ticket resolution notification: {str(e)}")
         self.retry(exc=e)
 
+
 @shared_task(bind=True, max_retries=3)
-def send_change_assignee_notification(
-    self, ticket_id, old_assignee_id, new_assignee_id
-):
+def send_change_assignee_notification(self, ticket_id, old_assignee_id, new_assignee_id):
     try:
         ticket = Ticket.objects.get(pk=ticket_id)
-        context = {
-            "ticket": ticket,
-            "new_assignee": (
-                User.objects.get(pk=new_assignee_id) if new_assignee_id else None
-            ),
-        }
 
-        if new_assignee_id:
-            html_content = render_to_string("core/new_assignee.html", context)
+        # Получаем объекты пользователей (если их ID переданы)
+        old_assignee = User.objects.get(pk=old_assignee_id) if old_assignee_id else None
+        new_assignee = User.objects.get(pk=new_assignee_id) if new_assignee_id else None
+
+        # 1. Отправляем письмо НОВОМУ инженеру (если его назначили)
+        if new_assignee:
+            context_new = {
+                "ticket": ticket,
+                "new_assignee": new_assignee,
+                "engineer_user": new_assignee,  # На всякий случай оставляем для совместимости
+            }
+            html_content = render_to_string("core/new_assignee.html", context_new)
             text_content = strip_tags(html_content)
 
-            new_assignee = User.objects.get(pk=new_assignee_id)
             msg = EmailMultiAlternatives(
-                subject=f"New task assignment: {ticket.title}",
+                subject=f"Назначена новая заявка: {ticket.ticket_number}",
                 body=text_content,
                 from_email=settings.EMAIL_HOST_USER,
                 to=[new_assignee.email],
@@ -169,13 +171,18 @@ def send_change_assignee_notification(
             msg.attach_alternative(html_content, "text/html")
             msg.send()
 
-        if old_assignee_id:
-            html_content = render_to_string("core/unassign_notify.html", context)
+        # 2. Отправляем письмо СТАРОМУ инженеру (если его сняли)
+        if old_assignee:
+            context_old = {
+                "ticket": ticket,
+                "old_assignee": old_assignee,
+                "engineer_user": old_assignee,  # Закрываем ту самую ошибку из логов
+            }
+            html_content = render_to_string("core/unassign_notify.html", context_old)
             text_content = strip_tags(html_content)
 
-            old_assignee = User.objects.get(pk=old_assignee_id)
             msg = EmailMultiAlternatives(
-                subject=f"Task reassignment: {ticket.title}",
+                subject=f"Снятие с заявки: {ticket.ticket_number}",
                 body=text_content,
                 from_email=settings.EMAIL_HOST_USER,
                 to=[old_assignee.email],
@@ -206,7 +213,7 @@ def send_remove_assignee_notification(self, ticket_id, old_assignee_id):
         text_content = strip_tags(html_content)
 
         email = EmailMultiAlternatives(
-            subject=f"Unassignment from task: {ticket.title}",
+            subject=f"Unassignment from task: {ticket.ticket_number}", # Исправлено
             body=text_content,
             from_email=settings.EMAIL_HOST_USER,
             to=[old_assignee.email],
@@ -224,15 +231,18 @@ def send_remove_assignee_notification(self, ticket_id, old_assignee_id):
         logger.error(f"Failed to send notification: {str(e)}")
         self.retry(exc=e)
 
-
 @shared_task(bind=True, max_retries=3)
 def send_change_status_notification(self, ticket_id, old_status, new_status):
     try:
-        ticket = Ticket.objects.get(pk=ticket_id)
-        recipients = [ticket.requestor.email]
+        # Оптимизируем запросы, сразу подтягивая автора и инженера
+        ticket = Ticket.objects.select_related("user", "assigned_engineer__user").get(pk=ticket_id)
+        
+        # Исправлено: ticket.requestor -> ticket.user
+        recipients = [ticket.user.email]
 
-        if ticket.assignee:
-            recipients.append(ticket.assignee.email)
+        # Исправлено: ticket.assignee -> ticket.assigned_engineer
+        if ticket.assigned_engineer and ticket.assigned_engineer.user:
+            recipients.append(ticket.assigned_engineer.user.email)
 
         context = {"ticket": ticket, "old_status": old_status, "new_status": new_status}
 
@@ -240,7 +250,7 @@ def send_change_status_notification(self, ticket_id, old_status, new_status):
         text_content = strip_tags(html_content)
 
         email = EmailMultiAlternatives(
-            subject=f"Status changed: {ticket.title}",
+            subject=f"Status changed: {ticket.ticket_number}", # Исправлено
             body=text_content,
             from_email=settings.EMAIL_HOST_USER,
             to=recipients,
@@ -270,7 +280,7 @@ def send_set_assignee_notification(self, ticket_id, new_assignee_id):
         text_content = strip_tags(html_content)
 
         email = EmailMultiAlternatives(
-            subject=f"New task assignment: {ticket.title}",
+            subject=f"New task assignment: {ticket.ticket_number}", # Исправлено
             body=text_content,
             from_email=settings.EMAIL_HOST_USER,
             to=[new_assignee.email],
@@ -320,26 +330,29 @@ def send_apply_for_organization_notification(self, admin_email, username, org_na
 @shared_task(bind=True, max_retries=3)
 def send_resolution_approved_notification(self, ticket_id):
     try:
+        # Исправлено: правильные связи ORM
         ticket = Ticket.objects.select_related(
-            "organization", "assignee", "requestor"
+            "category", "assigned_engineer__user", "user"
         ).get(id=ticket_id)
 
-        assignee = ticket.assignee
-        requestor = ticket.requestor
+        assignee_profile = ticket.assigned_engineer
+        requestor = ticket.user
 
-        if not assignee:
-            logger.error(f"No assignee for ticket {ticket.title}, notification skipped")
+        if not assignee_profile:
+            logger.error(f"No assignee for ticket {ticket.ticket_number}, notification skipped")
             return
+            
+        assignee_user = assignee_profile.user
 
         context = {
-            "ticket_title": ticket.title,
+            "ticket_title": ticket.ticket_number, # Исправлено
             "requestor_name": requestor.username,
-            "assignee_name": assignee.username,
-            "organization": ticket.organization.name,
+            "assignee_name": assignee_user.username,
+            "organization": ticket.category.name, # Исправлено: organization -> category
             "approval_time": timezone.now().strftime("%d.%m.%Y %H:%M:%S"),
         }
 
-        subject = f"Ticket {ticket.title} resolution confirmed by user"
+        subject = f"Ticket {ticket.ticket_number} resolution confirmed by user" # Исправлено
         html_content = render_to_string("core/resolution_approved.html", context)
         text_content = strip_tags(html_content)
 
@@ -347,14 +360,15 @@ def send_resolution_approved_notification(self, ticket_id):
             subject=subject,
             body=text_content,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[assignee.email],
+            to=[assignee_user.email],
             bcc=[settings.EMAIL_HOST_USER],
         )
         email.attach_alternative(html_content, "text/html")
         email.send(fail_silently=False)
 
     except Ticket.DoesNotExist:
-        logger.error(f"Ticket {ticket.title} not found for notification")
+        # Исправлено: ticket еще не определен в этом блоке, используем ticket_id
+        logger.error(f"Ticket {ticket_id} not found for notification")
         return
 
     except Exception as e:
@@ -362,3 +376,4 @@ def send_resolution_approved_notification(self, ticket_id):
             f"Failed to send resolution notification for {ticket_id}: {str(e)}"
         )
         self.retry(exc=e, countdown=2**self.request.retries)
+        

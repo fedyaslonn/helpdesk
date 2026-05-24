@@ -315,3 +315,22 @@ class TicketViewSet(viewsets.ModelViewSet):
         transaction.on_commit(lambda: send_remove_assignee_notification.delay(ticket.id, old_engineer_user.id))
         
         return Response({'status': 'unassigned', 'message': 'Инженер успешно снят с заявки'})
+
+    def perform_update(self, serializer):
+        # 1. Запоминаем старого инженера ДО сохранения новых данных
+        old_ticket = self.get_object()
+        old_assignee_id = old_ticket.assigned_engineer_id
+
+        # 2. Сохраняем новые данные в БД
+        ticket = serializer.save()
+
+        # 3. Проверяем, назначен ли новый инженер и отличается ли он от старого
+        if ticket.assigned_engineer_id and ticket.assigned_engineer_id != old_assignee_id:
+            # Твоя Celery-таска ожидает ID модели User (а не SupportEngineer).
+            # Поэтому передаем ticket.assigned_engineer.user_id
+            new_user_id = ticket.assigned_engineer.user_id
+            
+            # 🔥 Отправляем уведомление новому инженеру
+            transaction.on_commit(
+                lambda: send_set_assignee_notification.delay(ticket.id, new_user_id)
+            )
