@@ -32,7 +32,7 @@ def seed():
     print("Создаем администратора...")
     admin_user, _ = User.objects.get_or_create(
         username="admin_boss",
-        defaults={"role": User.Role.ADMIN, "email": "admin@test.com", "full_name": "Босс Админов", "is_verified": True}
+        defaults={"role": User.Role.ADMIN, "email": "admin@gmail.com", "full_name": "Босс Админов", "is_verified": True}
     )
     admin_user.set_password("admin123")
     admin_user.save()
@@ -41,11 +41,11 @@ def seed():
     print("Создаем 5 инженеров и их расписание на сегодня...")
     engineers_data = [
         # Логин, ФИО, Email, Макс. тикетов, На дежурстве, Начало смены, Конец смены
-        ("eng_petrov", "Петр Петров", "petrov@test.com", 5, True, time(8, 0), time(20, 0)),
-        ("eng_sidorov", "Сидор Сидоров", "sidorov@test.com", 3, False, time(20, 0), time(8, 0)),
-        ("eng_smirnov", "Алексей Смирнов", "smirnov@test.com", 4, True, time(9, 0), time(18, 0)),
-        ("eng_volkov", "Илья Волков", "volkov@test.com", 5, True, time(10, 0), time(19, 0)),
-        ("eng_zaitsev", "Николай Зайцев", "zaitsev@test.com", 3, False, time(12, 0), time(20, 0)),
+        ("eng_petrov", "Петр Петров", "petrov@gmail.com", 5, True, time(8, 0), time(20, 0)),
+        ("eng_sidorov", "Сидор Сидоров", "sidorov@gmail.com", 3, False, time(20, 0), time(8, 0)),
+        ("eng_smirnov", "Алексей Смирнов", "smirnov@gmail.com", 4, True, time(9, 0), time(18, 0)),
+        ("eng_volkov", "Илья Волков", "volkov@gmail.com", 5, True, time(10, 0), time(19, 0)),
+        ("eng_zaitsev", "Николай Зайцев", "zaitsev@gmail.com", 3, False, time(12, 0), time(20, 0)),
     ]
     
     eng_dict = {}
@@ -75,11 +75,11 @@ def seed():
     print("Создаем 5 клиентов...")
     clients_data = [
         # Логин, ФИО, Email, ID учетки, Должность
-        ("client_ivanov", "Иван Иванов", "ivanov@test.com", "ACC-001", "Бухгалтер"),
-        ("client_smirnova", "Анна Смирнова", "smirnova@test.com", "ACC-002", "Менеджер"),
-        ("client_kuznetsov", "Сергей Кузнецов", "kuznetsov@test.com", "ACC-003", "Директор"),
-        ("client_popova", "Мария Попова", "popova@test.com", "ACC-004", "HR-специалист"),
-        ("client_sokolov", "Алексей Соколов", "sokolov@test.com", "ACC-005", "Маркетолог"),
+        ("client_ivanov", "Иван Иванов", "ivanov@gmail.com", "ACC-001", "Бухгалтер"),
+        ("client_smirnova", "Анна Смирнова", "smirnova@gmail.com", "ACC-002", "Менеджер"),
+        ("client_kuznetsov", "Сергей Кузнецов", "kuznetsov@gmail.com", "ACC-003", "Директор"),
+        ("client_popova", "Мария Попова", "popova@gmail.com", "ACC-004", "HR-специалист"),
+        ("client_sokolov", "Алексей Соколов", "sokolov@gmail.com", "ACC-005", "Маркетолог"),
     ]
     
     client_dict = {}
