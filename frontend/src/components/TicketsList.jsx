@@ -239,11 +239,13 @@ const TicketsPage = () => {
     }
   };
 
-  const myRequests = tickets.filter(ticket => ticket.user === currentUser?.id || ticket.user?.id === currentUser?.id);
-  
-  const assignedToMe = tickets.filter(ticket => 
-    ticket.assigned_engineer && 
-    (ticket.assigned_engineer === currentUser?.id || ticket.assigned_engineer?.user === currentUser?.id)
+const myRequests = tickets.filter(
+    ticket => ticket.user === currentUser?.id || ticket.user?.id === currentUser?.id || ticket.requestor?.id === currentUser?.id
+  );
+
+  // 🔥 Исправленная фильтрация для "В моей работе" (как инженера)
+  const assignedToMe = tickets.filter(
+    ticket => ticket.assignee && ticket.assignee.id === currentUser?.id
   );
 
   const renderTicketCard = (ticket) => {

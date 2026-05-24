@@ -103,10 +103,8 @@ const TicketDetail = () => {
       const isAdmin = currentUser?.role === 'admin';
       const isEngineer = currentUser?.role === 'engineer';
       
-      // 🔥 ИСПРАВЛЕНИЕ 1: Правильное обращение к полю assigned_engineer
-      const isAssignee = 
-        ticket.assigned_engineer?.user?.id === currentUser?.id || 
-        ticket.assigned_engineer?.id === currentUser?.id;
+      // 🔥 ИСПРАВЛЕНИЕ 1: Берем ID из assignee и приводим к строке
+      const isAssignee = ticket.assignee && String(ticket.assignee.id) === String(currentUser?.id);
 
       if (!(isAdmin || (isEngineer && isAssignee))) return;
 
@@ -226,24 +224,22 @@ const TicketDetail = () => {
       </Box>
     );
   }
-  
+
   if (!ticket) return null;
 
   // Логика прав доступа
   const isAdmin = currentUser?.role === 'admin';
-  const isEngineer = currentUser?.role === 'engineer';
-  const isAuthor = ticket.requestor?.id === currentUser?.id;
-  
-  // 🔥 ИСПРАВЛЕНИЕ 2: Права текущего пользователя как назначенного инженера
-  const isAssignee = 
-    ticket.assigned_engineer?.user?.id === currentUser?.id || 
-    ticket.assigned_engineer?.id === currentUser?.id;
 
-  const canDelete = isAdmin;
-  const canAssign = isAdmin || isEngineer;
+  // 🔥 ИСПРАВЛЕНИЕ 2: Точная проверка через String()
+  const isAuthor = ticket.requestor && String(ticket.requestor.id) === String(currentUser?.id);
+  const isAssignee = ticket.assignee && String(ticket.assignee.id) === String(currentUser?.id);
+
+const canDelete = isAdmin;
+  const canAssign = isAdmin;
   const canChangeStatus = isAdmin || isAssignee;
   const canEditDesc = isAuthor;
-  const canClose = (isAuthor || isAssignee || isAdmin) && ['RS', 'WR'].includes(ticket.status);
+  // 🔥 Теперь кнопку закрытия увидит ТОЛЬКО админ
+  const canClose = isAdmin && ['RS', 'WR'].includes(ticket.status);
 
   return (
     <PageLayout maxWidth="max-w-6xl">
@@ -251,7 +247,7 @@ const TicketDetail = () => {
 
       <Box className="mb-6 flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <Button variant="outlined" color="inherit" size="small" onClick={() => navigate('/helpdesk/tickets')} className="!self-start">
-          ← Назад к заявкам
+          ← Назад к списку
         </Button>
         <Typography variant="h4" fontWeight="bold" className="!text-center sm:!flex-1">
           Заявка {ticket.ticket_number}
@@ -260,18 +256,18 @@ const TicketDetail = () => {
       </Box>
 
       {/* ОСНОВНОЙ КОНТЕНТ */}
-      <Box sx={{ 
-        display: 'flex', 
+      <Box sx={{
+        display: 'flex',
         flexDirection: { xs: 'column', md: 'row' },
         alignItems: 'flex-start',
-        gap: 4 
+        gap: 4
       }}>
-        
-        {/* ЛЕВАЯ КОЛОНКА: ИНФО О ЗАЯВКЕ */}
+
+        {/* ЛЕВАЯ КОЛОНКА */}
         <Box sx={{ width: { xs: '100%', md: '65%' } }}>
           <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0' }}>
             <CardContent sx={{ p: { xs: 3, md: 5 }, '&:last-child': { pb: { xs: 3, md: 5 } } }}>
-              
+
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mb: 4 }}>
                 <Box sx={{ flex: '1 1 45%' }}>
                   <Typography variant="caption" color="text.secondary" fontSize="0.9rem">Автор обращения</Typography>
@@ -279,10 +275,9 @@ const TicketDetail = () => {
                 </Box>
                 <Box sx={{ flex: '1 1 45%' }}>
                   <Typography variant="caption" color="text.secondary" fontSize="0.9rem">Назначенный инженер</Typography>
-                  {/* 🔥 ИСПРАВЛЕНИЕ 3: Вывод имени инженера */}
-<Typography variant="body1" fontWeight="bold" fontSize="1.1rem">
-  {ticket.assignee?.username || 'Не назначен'}
-</Typography>
+                  <Typography variant="body1" fontWeight="bold" fontSize="1.1rem">
+                    {ticket.assignee?.username || 'Не назначен'}
+                  </Typography>
                 </Box>
                 <Box sx={{ flex: '1 1 100%' }}>
                   <Typography variant="caption" color="text.secondary" fontSize="0.9rem">Категория проблемы</Typography>
@@ -295,7 +290,7 @@ const TicketDetail = () => {
               <Typography variant="subtitle1" fontWeight="bold" mb={2} color="#334155" textTransform="uppercase">
                 Описание проблемы
               </Typography>
-              <Typography variant="body1" sx={{ 
+              <Typography variant="body1" sx={{
                 whiteSpace: 'pre-wrap', color: '#0f172a', lineHeight: 1.8, fontSize: '1.05rem',
                 bgcolor: '#f8fafc', p: 3, borderRadius: 2, border: '1px solid #e2e8f0'
               }}>
@@ -320,7 +315,7 @@ const TicketDetail = () => {
           </Card>
         </Box>
 
-        {/* ПРАВАЯ КОЛОНКА: ПАНЕЛЬ ДЕЙСТВИЙ */}
+        {/* ПРАВАЯ КОЛОНКА */}
         <Box sx={{ width: { xs: '100%', md: '35%' }, position: 'sticky', top: 90 }}>
           <Stack spacing={3}>
 
@@ -406,8 +401,8 @@ const TicketDetail = () => {
               </Card>
             )}
 
-            {/* Блок подтверждения решения (Появляется только у Автора/Админа в статусе WR) */}
-            {ticket.status === 'WR' && (isAuthor || isAdmin) && (
+            {/* Блок подтверждения решения */}
+              {ticket.status === 'WR' && isAuthor && (
               <Card elevation={0} sx={{ bgcolor: '#f0fdf4', borderRadius: 2, border: '1px solid #bbf7d0' }}>
                 <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
                   <Typography variant="subtitle1" fontWeight="bold" color="#166534" mb={1}>
@@ -422,7 +417,7 @@ const TicketDetail = () => {
                 </CardContent>
               </Card>
             )}
-            
+
             {/* Блок действий автора */}
             {canEditDesc && (
               <Card elevation={0} sx={{ bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
@@ -437,14 +432,14 @@ const TicketDetail = () => {
               </Card>
             )}
 
-            {/* Блок назначения (Админ / Инженер) */}
+            {/* Блок назначения (Только Админ) */}
             {canAssign && ticket.status !== 'CL' && (
               <Card elevation={0} sx={{ bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
                 <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
                   <Typography variant="subtitle1" fontWeight="bold" color="#334155" mb={3}>
                     Назначение инженера
                   </Typography>
-                  
+
                   <Stack spacing={2}>
                     <Button variant="contained" color="primary" size="large" fullWidth onClick={handleAutoAssign}>
                       Авто-назначение
@@ -460,13 +455,16 @@ const TicketDetail = () => {
                     >
                       <MenuItem value=""><em>Не выбран</em></MenuItem>
                       {engineers.map(eng => (
-                        <MenuItem key={eng.id} value={eng.id}>{eng.username}</MenuItem>
+                        <MenuItem key={eng.id} value={eng.id}>
+                          {eng.user?.username || eng.username || 'Без имени'}
+                        </MenuItem>
                       ))}
                     </TextField>
                     <Button variant="outlined" color="primary" size="large" fullWidth onClick={handleManualAssign} disabled={!selectedEngineer}>
                       Назначить
                     </Button>
-                    {ticket.assigned_engineer && isAdmin && (
+                    {/* 🔥 ИСПРАВЛЕНИЕ 3: ticket.assignee вместо ticket.assigned_engineer */}
+                    {ticket.assignee && isAdmin && (
                       <Button variant="outlined" color="error" size="large" fullWidth onClick={handleUnassign}>
                         Снять инженера
                       </Button>
@@ -483,7 +481,7 @@ const TicketDetail = () => {
                   <Typography variant="subtitle1" fontWeight="bold" color="#92400e" mb={3}>
                     Изменить статус
                   </Typography>
-                  
+
                   <Box display="flex" flexDirection="column">
                     <TextField
                       select
@@ -507,7 +505,7 @@ const TicketDetail = () => {
               </Card>
             )}
 
-            {/* Блок финального закрытия */}
+            {/* Блок закрытия */}
             {canClose && (
               <Card elevation={0} sx={{ bgcolor: '#fef2f2', borderRadius: 2, border: '1px solid #fecaca' }}>
                 <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
@@ -526,7 +524,6 @@ const TicketDetail = () => {
 
           </Stack>
         </Box>
-
       </Box>
 
       {/* ДОЧЕРНИЕ КОМПОНЕНТЫ */}
@@ -538,8 +535,8 @@ const TicketDetail = () => {
         />
       </Box>
       <Box mt={4}>
-        {/* 🔥 ИСПРАВЛЕНИЕ 5: Проброс правильного ID инженера */}
-        <TicketSessions ticketId={ticket.id} assigneeId={ticket.assigned_engineer?.id} />
+        {/* 🔥 ИСПРАВЛЕНИЕ 4: ticket.assignee?.id вместо ticket.assigned_engineer?.id */}
+        <TicketSessions ticketId={ticket.id} assigneeId={ticket.assignee?.id} />
       </Box>
       <Box mt={4}>
         <TicketComments ticketId={ticket.id} />

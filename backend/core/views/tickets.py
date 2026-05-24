@@ -28,21 +28,18 @@ class TicketViewSet(viewsets.ModelViewSet):
     serializer_class = TicketSerializer
     permission_classes = [CanInteractWithTicket]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_class = TicketFilter # Твой кастомный фильтр
+    filterset_class = TicketFilter
     search_fields = ['ticket_number', 'description', 'category__name']
     ordering_fields = ['created_at', 'sla_deadline', 'status']
     ordering = ['-created_at']
 
     def get_permissions(self):
-        # List/Create: достаточно аутентификации (доступ фильтруется в get_queryset)
-        # Detail: полная проверка прав
         if self.action in ['list', 'create']:
             return [IsAuthenticated()]
         return super().get_permissions()
 
     def get_queryset(self):
         user = self.request.user
-        # Оптимизация: select_related для FK, prefetch для обратных связей
         qs = Ticket.objects.select_related(
             'user', 'category', 'assigned_engineer__user'
         ).prefetch_related('comments__author')
@@ -50,7 +47,6 @@ class TicketViewSet(viewsets.ModelViewSet):
         if user.role == User.Role.ADMIN:
             return qs
         elif user.role == User.Role.ENGINEER:
-            # Инженер видит свои заявки и заявки, которые он создал
             return qs.filter(
                 models.Q(assigned_engineer__user=user) | models.Q(user=user)
             )
@@ -58,62 +54,73 @@ class TicketViewSet(viewsets.ModelViewSet):
             return qs.filter(user=user)
 
     def perform_create(self, serializer):
-        ticket = serializer.save(user=self.request.user)
-        # Автоматическое уведомление
-        
-        # 3. Системные уведомления и Email клиенту (что заявка создана)
-        Notification.objects.create(
-            user=ticket.user, ticket=ticket,
-            message=f"Заявка {ticket.ticket_number} успешно создана",
-            notification_type=Notification.Type.TICKET_CREATED
-        )
-        # 4. 🔥 Отправляем уведомление клиенту (что заявка создана)
-        transaction.on_commit(lambda: send_ticket_created_notification.delay(ticket.id))
-        
-        # 3. 🔥 Отправляем тикет на обработку ИИ и авто-назначение!
-        transaction.on_commit(lambda: process_ai_classification_and_assignment.delay(ticket.id))
+        # 🔥 ДОБАВЛЕНО: Транзакция для безопасного создания заявки, уведомлений и запуска Celery
+        with transaction.atomic():
+            ticket = serializer.save(user=self.request.user)
 
+            Notification.objects.create(
+                user=ticket.user, ticket=ticket,
+                message=f"Заявка {ticket.ticket_number} успешно создана",
+                notification_type=Notification.Type.TICKET_CREATED
+            )
 
+            transaction.on_commit(lambda: send_ticket_created_notification.delay(ticket.id))
+            transaction.on_commit(lambda: process_ai_classification_and_assignment.delay(ticket.id))
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrEngineer])
     def assign(self, request, pk=None):
         """Ручное назначение инженера на заявку"""
+
+        # 🔥 ДОБАВЛЕНО: Жесткая блокировка для всех, кроме Администратора
+        if request.user.role != User.Role.ADMIN:
+            return Response(
+                {'error': 'Только администратор имеет право назначать и переназначать заявки.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         ticket = self.get_object()
         engineer_id = request.data.get('engineer_id')
 
         if not engineer_id:
             return Response({'error': 'engineer_id обязателен'}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            engineer = SupportEngineer.objects.select_related('user').get(id=engineer_id)
-        except SupportEngineer.DoesNotExist:
+        engineer = SupportEngineer.objects.select_related('user').filter(
+            models.Q(id=engineer_id) | models.Q(user__id=engineer_id)
+        ).first()
+
+        if not engineer:
             return Response({'error': 'Инженер не найден'}, status=status.HTTP_404_NOT_FOUND)
 
         if engineer.user.role != User.Role.ENGINEER:
-            return Response({'error': 'Пользователь не является инженером поддержки'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Назначенный пользователь не является инженером'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # 🔥 Сохраняем старого назначенного до изменения
         old_assignee_id = ticket.assigned_engineer.user.id if ticket.assigned_engineer else None
 
-        ticket.assign_engineer(engineer, assigned_by=request.user)
+        # Блок транзакции оставляем как было
+        with transaction.atomic():
+            ticket.assign_engineer(engineer, assigned_by=request.user)
 
-        Notification.objects.create(
-            user=engineer.user, ticket=ticket,
-            message=f"Вам назначена заявка {ticket.ticket_number}",
-            notification_type=Notification.Type.ASSIGNED
-        )
+            Notification.objects.create(
+                user=engineer.user,
+                ticket=ticket,
+                message=f"Вам назначена заявка {ticket.ticket_number}",
+                notification_type=Notification.Type.ASSIGNED
+            )
 
-        # 🔥 Отправляем уведомление через Celery
-        transaction.on_commit(lambda: send_change_assignee_notification.delay(
-            ticket.id, old_assignee_id, engineer.user.id
-        ))
+            transaction.on_commit(
+                lambda: send_change_assignee_notification.delay(
+                    ticket.id, old_assignee_id, engineer.user.id
+                )
+            )
 
         return Response(self.get_serializer(ticket).data)
 
     @action(detail=False, methods=['post'], permission_classes=[IsAdminOrEngineer])
     def auto_assign(self, request):
-        """Автоматическое назначение через менеджер"""
+        """Принудительное авто-назначение"""
         ticket_id = request.data.get('ticket_id')
         if not ticket_id:
             return Response({'error': 'ticket_id обязателен'}, status=status.HTTP_400_BAD_REQUEST)
@@ -121,8 +128,9 @@ class TicketViewSet(viewsets.ModelViewSet):
         try:
             ticket = Ticket.objects.get(id=ticket_id, status=Ticket.Status.OPEN)
         except Ticket.DoesNotExist:
-            return Response({'error': 'Заявка не найдена или уже не открыта'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Заявка не найдена или уже в работе'}, status=status.HTTP_404_NOT_FOUND)
 
+        # Здесь транзакция уже была
         with transaction.atomic():
             ticket = Ticket.objects.auto_assign(ticket)
             if ticket.assigned_engineer:
@@ -135,28 +143,23 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[CanInteractWithTicket])
     def close(self, request, pk=None):
-        """Финальное закрытие заявки (доступно автору и назначенному инженеру/админу)"""
+        """Закрытие заявки"""
         ticket = self.get_object()
         if ticket.status not in [Ticket.Status.RESOLVED, Ticket.Status.WAITING]:
-            return Response({'error': 'Заявка должна быть в статусе Решена или Ожидание'},
+            return Response({'error': 'Нельзя закрыть заявку в текущем статусе'},
                             status=status.HTTP_400_BAD_REQUEST)
 
         ticket.status = Ticket.Status.CLOSED
         ticket.save(update_fields=['status', 'updated_at'])
-        return Response({'status': 'closed', 'message': 'Заявка успешно закрыта'})
-
+        return Response({'status': 'closed', 'message': 'Заявка закрыта'})
 
     # =======================================================
-    # ЛОГИКА КОММЕНТАРИЕВ (Вложенные эндпоинты)
+    # Блок комментариев
     # =======================================================
 
     @action(detail=True, methods=['get', 'post'], url_path='comments')
     def manage_comments(self, request, pk=None):
-        """
-        GET /tickets/{id}/comments/ - получить все комментарии заявки
-        POST /tickets/{id}/comments/ - добавить комментарий к заявке
-        """
-        ticket = self.get_object() # Это автоматически проверит права доступа к самой заявке!
+        ticket = self.get_object()
 
         if request.method == 'GET':
             comments = ticket.comments.select_related('author').order_by('-created_at')
@@ -164,32 +167,21 @@ class TicketViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
 
         if request.method == 'POST':
-            # Используем твой CreateCommentSerializer
             serializer = CreateCommentSerializer(data=request.data, context={'request': request})
             serializer.is_valid(raise_exception=True)
-            
-            # Сохраняем, жестко привязывая к заявке и текущему пользователю
             comment = serializer.save(ticket=ticket, author=request.user)
-            
-            # Возвращаем созданный комментарий в развернутом виде (чтобы React сразу отрисовал автора)
             return Response(GetCommentSerializer(comment).data, status=status.HTTP_201_CREATED)
 
-    # Используем url_path с регулярным выражением для выхватывания ID комментария
     @action(detail=True, methods=['patch', 'delete'], url_path=r'comments/(?P<comment_id>\d+)')
     def comment_detail(self, request, pk=None, comment_id=None):
-        """
-        PATCH /tickets/{id}/comments/{comment_id}/ - редактировать комментарий
-        DELETE /tickets/{id}/comments/{comment_id}/ - удалить комментарий
-        """
         ticket = self.get_object()
-        
+
         try:
             comment = ticket.comments.get(id=comment_id)
         except Comment.DoesNotExist:
             return Response({"error": "Комментарий не найден"}, status=status.HTTP_404_NOT_FOUND)
 
         if request.method == 'PATCH':
-            # Передаем request в context, чтобы отработала твоя логика validate() из PartialUpdateCommentSerializer
             serializer = PartialUpdateCommentSerializer(
                 comment, data=request.data, partial=True, context={'request': request}
             )
@@ -198,139 +190,97 @@ class TicketViewSet(viewsets.ModelViewSet):
             return Response(GetCommentSerializer(comment).data)
 
         if request.method == 'DELETE':
-            # Проверяем права на удаление (автор комментария или администратор)
             if request.user != comment.author and request.user.role != User.Role.ADMIN:
                 return Response({"error": "Вы не можете удалить этот комментарий"}, status=status.HTTP_403_FORBIDDEN)
-            
+
             comment.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post'], permission_classes=[CanInteractWithTicket])
     def approve_resolution(self, request, pk=None):
-        """Подтверждение решения пользователем"""
+        """Подтверждение решения клиентом"""
         ticket = self.get_object()
-        
+
         if request.user != ticket.user and request.user.role != User.Role.ADMIN:
             return Response(
-                {'error': 'Только автор заявки может подтвердить решение.'}, 
+                {'error': 'Только автор заявки может подтвердить решение.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-            
+
         if ticket.status != Ticket.Status.WAITING:
             return Response(
-                {'error': 'Заявка не находится в статусе ожидания подтверждения (WR).'}, 
+                {'error': 'Заявка не находится в статусе ожидания подтверждения (WR).'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        old_status = ticket.status  # 🔥 Сохраняем старый статус
-        ticket.status = Ticket.Status.RESOLVED
-        ticket.save(update_fields=['status', 'updated_at'])
-        
-        if ticket.assigned_engineer:
-            Notification.objects.create(
-                user=ticket.assigned_engineer.user, ticket=ticket,
-                message=f"Пользователь подтвердил решение по заявке {ticket.ticket_number}. Отличная работа!",
-                notification_type=Notification.Type.STATUS_CHANGED
-            )
-        
-        # 🔥 Уведомление об изменении статуса
-        transaction.on_commit(lambda: send_change_status_notification.delay(
-            ticket.id, old_status, Ticket.Status.RESOLVED
-        ))
-        
-        # 🔥 Уведомление об одобрении решения (отдельный таск)
-        transaction.on_commit(lambda: send_resolution_approved_notification.delay(ticket.id))
-        
+
+        old_status = ticket.status
+
+        # 🔥 ДОБАВЛЕНО: Транзакция для обновления статуса, уведомления и 2-х задач Celery
+        with transaction.atomic():
+            ticket.status = Ticket.Status.RESOLVED
+            ticket.save(update_fields=['status', 'updated_at'])
+
+            if ticket.assigned_engineer:
+                Notification.objects.create(
+                    user=ticket.assigned_engineer.user, ticket=ticket,
+                    message=f"Пользователь подтвердил решение по заявке {ticket.ticket_number}. Отличная работа!",
+                    notification_type=Notification.Type.STATUS_CHANGED
+                )
+
+            transaction.on_commit(lambda: send_change_status_notification.delay(
+                ticket.id, old_status, Ticket.Status.RESOLVED
+            ))
+
+            transaction.on_commit(lambda: send_resolution_approved_notification.delay(ticket.id))
+
         return Response({'status': 'resolved', 'message': 'Решение успешно подтверждено'})
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrEngineer])
     def unassign(self, request, pk=None):
-        """Снятие инженера с заявки (Доступно только Админу)"""
+        """Снятие инженера с заявки (перевод обратно в OPEN)"""
         ticket = self.get_object()
-        
+
         if request.user.role != User.Role.ADMIN:
             return Response(
-                {'error': 'Только администратор может снимать инженера с заявки'}, 
+                {'error': 'Только администратор может снимать инженера с заявки'},
                 status=status.HTTP_403_FORBIDDEN
             )
-            
+
         if not ticket.assigned_engineer:
             return Response(
-                {'error': 'На эту заявку не назначен инженер'}, 
+                {'error': 'На эту заявку не назначен инженер'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-            
+
         old_engineer_user = ticket.assigned_engineer.user
-        
-        ticket.assigned_engineer = None
-        ticket.status = Ticket.Status.OPEN
-        ticket.save(update_fields=['assigned_engineer', 'status', 'updated_at'])
-        
-        Notification.objects.create(
-            user=old_engineer_user, ticket=ticket,
-            message=f"Администратор снял вас с выполнения заявки {ticket.ticket_number}.",
-            notification_type=Notification.Type.STATUS_CHANGED
-        )
-        
-        # 🔥 Отправляем уведомление об отмене назначения
-        transaction.on_commit(lambda: send_remove_assignee_notification.delay(
-            ticket.id, old_engineer_user.id
-        ))
-        
-        return Response({'status': 'unassigned', 'message': 'Инженер успешно снят с заявки'})
-        
-    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrEngineer])
-    def unassign(self, request, pk=None):
-        """Снятие инженера с заявки (Доступно только Админу)"""
-        ticket = self.get_object()
-        
-        # Проверка прав: только админ может снимать инженеров
-        if request.user.role != User.Role.ADMIN:
-            return Response(
-                {'error': 'Только администратор может снимать инженера с заявки'}, 
-                status=status.HTTP_403_FORBIDDEN
+
+        # 🔥 ДОБАВЛЕНО: Транзакция для безопасного снятия и отправки письма
+        with transaction.atomic():
+            ticket.assigned_engineer = None
+            ticket.status = Ticket.Status.OPEN
+            ticket.save(update_fields=['assigned_engineer', 'status', 'updated_at'])
+
+            Notification.objects.create(
+                user=old_engineer_user, ticket=ticket,
+                message=f"Администратор снял вас с выполнения заявки {ticket.ticket_number}.",
+                notification_type=Notification.Type.STATUS_CHANGED
             )
-            
-        if not ticket.assigned_engineer:
-            return Response(
-                {'error': 'На эту заявку не назначен инженер'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-            
-        old_engineer_user = ticket.assigned_engineer.user
-        
-        # Снимаем инженера и возвращаем статус "Открыта" (OP)
-        ticket.assigned_engineer = None
-        ticket.status = Ticket.Status.OPEN
-        ticket.save(update_fields=['assigned_engineer', 'status', 'updated_at'])
-        
-        # Системное уведомление внутри приложения
-        Notification.objects.create(
-            user=old_engineer_user, ticket=ticket,
-            message=f"Администратор снял вас с выполнения заявки {ticket.ticket_number}.",
-            notification_type=Notification.Type.STATUS_CHANGED
-        )
-        
-        # Фоновая отправка письма
-        transaction.on_commit(lambda: send_remove_assignee_notification.delay(ticket.id, old_engineer_user.id))
-        
+
+            transaction.on_commit(lambda: send_remove_assignee_notification.delay(ticket.id, old_engineer_user.id))
+
         return Response({'status': 'unassigned', 'message': 'Инженер успешно снят с заявки'})
 
     def perform_update(self, serializer):
-        # 1. Запоминаем старого инженера ДО сохранения новых данных
         old_ticket = self.get_object()
         old_assignee_id = old_ticket.assigned_engineer_id
 
-        # 2. Сохраняем новые данные в БД
-        ticket = serializer.save()
+        # 🔥 ДОБАВЛЕНО: Транзакция для обновления и отправки письма о ручном назначении
+        with transaction.atomic():
+            ticket = serializer.save()
 
-        # 3. Проверяем, назначен ли новый инженер и отличается ли он от старого
-        if ticket.assigned_engineer_id and ticket.assigned_engineer_id != old_assignee_id:
-            # Твоя Celery-таска ожидает ID модели User (а не SupportEngineer).
-            # Поэтому передаем ticket.assigned_engineer.user_id
-            new_user_id = ticket.assigned_engineer.user_id
-            
-            # 🔥 Отправляем уведомление новому инженеру
-            transaction.on_commit(
-                lambda: send_set_assignee_notification.delay(ticket.id, new_user_id)
-            )
+            if ticket.assigned_engineer_id and ticket.assigned_engineer_id != old_assignee_id:
+                new_user_id = ticket.assigned_engineer.user_id
+
+                transaction.on_commit(
+                    lambda: send_set_assignee_notification.delay(ticket.id, new_user_id)
+                )
