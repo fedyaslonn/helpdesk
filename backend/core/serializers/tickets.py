@@ -58,9 +58,15 @@ class TicketSerializer(serializers.ModelSerializer):
         return obj.comments.count()
 
     def get_is_sla_breached(self, obj):
-        if obj.sla_deadline and obj.status not in [Ticket.Status.RESOLVED, Ticket.Status.CLOSED]:
-            return timezone.now() > obj.sla_deadline
-        return False
+        if not obj.sla_deadline:
+            return False
+            
+        # Если заявка уже решена, сравниваем дедлайн с фактическим временем решения
+        if obj.resolved_at:
+            return obj.resolved_at > obj.sla_deadline
+            
+        # Если заявка всё ещё в работе, сравниваем дедлайн с текущим временем
+        return timezone.now() > obj.sla_deadline
 
     def validate_assigned_engineer(self, value):
         if value and value.user.role != User.Role.ENGINEER:

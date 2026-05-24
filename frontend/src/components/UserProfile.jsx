@@ -297,7 +297,7 @@ const UserProfile = () => {
               {user.role === "engineer" && user.engineer_profile && (
                 <Box>
                   <Typography variant="overline" color="text.secondary" fontWeight="bold" display="block" mb={2}>
-                    Профиль инженера
+                    Профиль инженера и статистика
                   </Typography>
                   <Grid container spacing={3}>
                     <Grid size={{ xs: 12, sm: 6 }}>
@@ -308,8 +308,29 @@ const UserProfile = () => {
                       </InfoItem>
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                      <InfoItem label="Лимит заявок" value={String(user.engineer_profile.max_concurrent_tickets)} />
+                      <InfoItem label="Лимит заявок" value={String(user.engineer_profile.max_concurrent_tickets || 0)} />
                     </Grid>
+
+                    {/* НОВЫЕ ПОЛЯ СО СТАТИСТИКОЙ */}
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <InfoItem label="Решенных тикетов">
+                        <Typography variant="body1" fontWeight="bold" color="primary.main">
+                          {user.engineer_profile.resolved_tickets_count || 0}
+                        </Typography>
+                      </InfoItem>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <InfoItem label="Просроченных тикетов (SLA)">
+                        <Typography 
+                          variant="body1" 
+                          fontWeight="bold" 
+                          color={(user.engineer_profile.breached_tickets_count || 0) > 0 ? "error.main" : "success.main"}
+                        >
+                          {user.engineer_profile.breached_tickets_count || 0}
+                        </Typography>
+                      </InfoItem>
+                    </Grid>
+
                     <Grid size={{ xs: 12 }}>
                       <InfoItem label="Последнее решение" value={formatDate(user.engineer_profile.last_ticket_resolved_at)} />
                     </Grid>

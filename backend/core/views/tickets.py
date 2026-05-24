@@ -118,28 +118,36 @@ class TicketViewSet(viewsets.ModelViewSet):
 
         return Response(self.get_serializer(ticket).data)
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAdminOrEngineer])
-    def auto_assign(self, request):
-        """Принудительное авто-назначение"""
-        ticket_id = request.data.get('ticket_id')
-        if not ticket_id:
-            return Response({'error': 'ticket_id обязателен'}, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrEngineer])
+    def auto_assign(self, request, pk=None):
+        """Принудительное авто-назначение (по кнопке из интерфейса)"""
+        ticket = self.get_object() # Теперь берем тикет по URL (detail=True)
 
-        try:
-            ticket = Ticket.objects.get(id=ticket_id, status=Ticket.Status.OPEN)
-        except Ticket.DoesNotExist:
-            return Response({'error': 'Заявка не найдена или уже в работе'}, status=status.HTTP_404_NOT_FOUND)
+        # Проверяем статус (нельзя авто-назначать закрытые/решенные)
+        if ticket.status in [Ticket.Status.RESOLVED, Ticket.Status.CLOSED]:
+            return Response(
+                {'error': 'Нельзя назначать инженера на закрытую или решенную заявку'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # Здесь транзакция уже была
         with transaction.atomic():
+            # Запускаем логику поиска
             ticket = Ticket.objects.auto_assign(ticket)
+            
+            # 🔥 ГЛАВНАЯ ПРОВЕРКА: Смог ли менеджер кого-то найти?
             if ticket.assigned_engineer:
                 Notification.objects.create(
                     user=ticket.assigned_engineer.user, ticket=ticket,
-                    message=f"Автоматически назначена заявка {ticket.ticket_number}",
+                    message=f"Вам автоматически назначена заявка {ticket.ticket_number}",
                     notification_type=Notification.Type.ASSIGNED
                 )
-        return Response(self.get_serializer(ticket).data)
+                return Response(self.get_serializer(ticket).data)
+            else:
+                # Если никто не назначен, бьем тревогу на фронтенд!
+                return Response(
+                    {'error': 'Нет доступных инженеров (никто не на смене, не на дежурстве или превышены лимиты)'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
     @action(detail=True, methods=['post'], permission_classes=[CanInteractWithTicket])
     def close(self, request, pk=None):

@@ -298,6 +298,7 @@ class Ticket(TimestampedModel):
         related_name="assigned_tickets", verbose_name=_("Назначенный инженер")
     )
     sla_deadline = models.DateTimeField(null=True, blank=True, verbose_name=_("SLA дедлайн"))
+    resolved_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Фактическое время решения"))
     status = models.CharField(max_length=2, choices=Status.choices, default=Status.OPEN, verbose_name=_("Статус"))
     description = models.TextField(validators=[MinLengthValidator(8)], verbose_name=_("Описание проблемы"))
 
@@ -313,10 +314,17 @@ class Ticket(TimestampedModel):
         is_new = self.pk is None
         if not self.ticket_number:
             self.ticket_number = f"TK-{uuid.uuid4().hex[:8].upper()}"
+            
+        # 🔥 ДОБАВЛЯЕМ ЛОГИКУ ФИКСАЦИИ ВРЕМЕНИ РЕШЕНИЯ
+        if self.status in [self.Status.WAITING, self.Status.RESOLVED] and not self.resolved_at:
+            from django.utils import timezone
+            self.resolved_at = timezone.now()
         
-        
-        super().save(*args, **kwargs)
+        # Если тикет вернули в работу (например, клиент нажал "Проблема не решена")
+        elif self.status in [self.Status.OPEN, self.Status.IN_PROGRESS]:
+            self.resolved_at = None 
 
+        super().save(*args, **kwargs)
     def _calculate_sla_deadline(self):
         effective_priority = self.priority or self.category.default_priority
         if not effective_priority:

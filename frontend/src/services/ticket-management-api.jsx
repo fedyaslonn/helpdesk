@@ -20,8 +20,10 @@ export const deleteTicket = (id) => apiClientInstance.delete(`/helpdesk/tickets/
 export const assignTicket = (ticketId, engineerId) => 
   apiClientInstance.post(`/helpdesk/tickets/${ticketId}/assign/`, { engineer_id: engineerId })
 
-export const autoAssignTicket = (ticketId) => 
-  apiClientInstance.post(`/helpdesk/tickets/auto_assign/`, { ticket_id: ticketId })
+export const autoAssignTicket = (ticketId) => {
+  // Теперь отправляем POST прямо на URL конкретного тикета (без тела запроса)
+  return api.post(`/tickets/${ticketId}/auto_assign/`);
+};
 
 export const closeTicket = (ticketId) => 
   apiClientInstance.post(`/helpdesk/tickets/${ticketId}/close/`)
