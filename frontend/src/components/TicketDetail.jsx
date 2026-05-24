@@ -291,9 +291,9 @@ const TicketDetail = () => {
                 <Box sx={{ flex: '1 1 45%' }}>
                   <Typography variant="caption" color="text.secondary" fontSize="0.9rem">Назначенный инженер</Typography>
                   {/* 🔥 ИСПРАВЛЕНИЕ 3: Вывод имени инженера */}
-                  <Typography variant="body1" fontWeight="bold" fontSize="1.1rem">
-                    {ticket.assigned_engineer?.user?.username || ticket.assigned_engineer?.username || 'Не назначен'}
-                  </Typography>
+<Typography variant="body1" fontWeight="bold" fontSize="1.1rem">
+  {ticket.assignee?.username || 'Не назначен'}
+</Typography>
                 </Box>
                 <Box sx={{ flex: '1 1 100%' }}>
                   <Typography variant="caption" color="text.secondary" fontSize="0.9rem">Категория проблемы</Typography>

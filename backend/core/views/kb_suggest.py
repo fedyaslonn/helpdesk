@@ -6,8 +6,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.ai.ollama_generate import generate_text
-from core.kb.elasticsearch_client import search_kb, search_kb_db_fallback
-from core.models import KnowledgeBaseArticle, Ticket, User
+from core.kb.search import search_kb
+from core.models import Ticket, User
 
 
 def _excerpt(text: str, max_len: int = 220) -> str:
@@ -18,7 +18,7 @@ def _excerpt(text: str, max_len: int = 220) -> str:
 class KBSuggestView(APIView):
     """
     GET /helpdesk/kb/suggest/?ticket_id=ID
-    Синхронный поиск в Elasticsearch + (опционально) RAG-черновик через Ollama.
+    Полнотекстовый поиск статей БЗ (PostgreSQL) + (опционально) RAG-черновик через Ollama.
     """
 
     permission_classes = [IsAuthenticated]
@@ -41,19 +41,12 @@ class KBSuggestView(APIView):
             return Response({"detail": "Forbidden"}, status=403)
 
         query = ticket.description or ""
-        is_published_only = False  # для инженера показываем и внутренние статьи тоже
+        is_published_only = False
         hits = search_kb(query=query, size=3, is_published_only=is_published_only)
-
-        article_ids = [h["id"] for h in hits]
-        articles_by_id = {
-            a.id: a
-            for a in KnowledgeBaseArticle.objects.select_related("category")
-            .filter(id__in=article_ids)
-        }
 
         articles_payload = []
         for h in hits:
-            a = articles_by_id.get(h["id"])
+            a = h.get("article")
             if not a:
                 continue
             articles_payload.append(
@@ -68,37 +61,9 @@ class KBSuggestView(APIView):
                 }
             )
 
-        # Индекс ES мог устареть (старые _id без записей в БД) — ищем в PostgreSQL
-        if not articles_payload and query.strip():
-            fallback_hits = search_kb_db_fallback(
-                query, size=3, is_published_only=is_published_only
-            )
-            fallback_ids = [h["id"] for h in fallback_hits]
-            articles_by_id = {
-                a.id: a
-                for a in KnowledgeBaseArticle.objects.select_related("category")
-                .filter(id__in=fallback_ids)
-            }
-            for h in fallback_hits:
-                a = articles_by_id.get(h["id"])
-                if not a:
-                    continue
-                articles_payload.append(
-                    {
-                        "id": a.id,
-                        "title": a.title,
-                        "category_name": a.category.name if a.category_id else None,
-                        "score": h["score"],
-                        "excerpt": _excerpt(a.content),
-                        "content": a.content,
-                        "helpful_count": a.helpful_count,
-                    }
-                )
-
         draft = None
         top_article_id = articles_payload[0]["id"] if articles_payload else None
 
-        # RAG (опционально): только если есть статьи
         if articles_payload:
             context_blocks = []
             for a in articles_payload:
@@ -132,4 +97,3 @@ class KBSuggestView(APIView):
                 "generated_at": timezone.now().isoformat(),
             }
         )
-

@@ -1,4 +1,3 @@
-from django.db import transaction
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -7,8 +6,6 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from core.models import KnowledgeBaseArticle
 from core.serializers.kb import KBArticleSerializer
 from core.permissions import KBAccessPermission
-from core.tasks import index_kb_article_task
-
 class KnowledgeBaseViewSet(viewsets.ModelViewSet):
     """API для Базы знаний."""
     queryset = KnowledgeBaseArticle.objects.select_related('author', 'category').all()
@@ -38,12 +35,7 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        article = serializer.save(author=self.request.user)
-        transaction.on_commit(lambda: index_kb_article_task.delay(article.id))
-
-    def perform_update(self, serializer):
-        article = serializer.save()
-        transaction.on_commit(lambda: index_kb_article_task.delay(article.id))
+        serializer.save(author=self.request.user)
 
     def retrieve(self, request, *args, **kwargs):
         """Переопределяем получение одной статьи, чтобы инкрементировать просмотры."""

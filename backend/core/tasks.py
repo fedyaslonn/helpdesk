@@ -8,8 +8,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import strip_tags
 from datetime import timedelta
-from .kb.elasticsearch_client import build_kb_document, delete_article, index_article
-from core.models import KnowledgeBaseArticle, Ticket
+from core.models import Ticket
 
 from django.db import transaction
 
@@ -76,28 +75,6 @@ def process_ai_classification_and_assignment(ticket_id):
         # ⏱ В самом конце (даже если была ошибка) останавливаем таймер и пишем в гистограмму
         duration = time.time() - start_time
         AI_CLASSIFICATION_DURATION.observe(duration)
-
-@shared_task(bind=True, max_retries=3, default_retry_delay=2)
-def index_kb_article_task(self, article_id: int):
-    """
-    Асинхронная индексация KB статьи в Elasticsearch.
-    Запускается ТОЛЬКО после commit транзакции (через transaction.on_commit).
-    """
-    try:
-        article = (
-            KnowledgeBaseArticle.objects.select_related("category")
-            .only("id", "title", "content", "tags", "is_published", "updated_at", "category__id", "category__name")
-            .get(pk=article_id)
-        )
-
-        index_article(article_id=article.id, doc=build_kb_document(article))
-    except KnowledgeBaseArticle.DoesNotExist:
-        # если статью удалили до таски — удаляем из индекса
-        delete_article(article_id=article_id)
-    except Exception as e:
-        logger.error(f"Failed to index KB article {article_id}: {e}")
-        raise self.retry(exc=e)
-
 
 @shared_task(bind=True, max_retries=3)
 def send_ticket_created_notification(self, ticket_id):

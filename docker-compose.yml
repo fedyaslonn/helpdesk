@@ -112,21 +112,6 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
-    container_name: elasticsearch
-    restart: unless-stopped
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
-    ports:
-      - "9200:9200"
-    networks:
-      - app_network
-    volumes:
-      - es_data:/usr/share/elasticsearch/data
-
   # ==========================================
   # 🔥 БЛОК МОНИТОРИНГА (Prometheus + Grafana)
   # ==========================================
@@ -161,7 +146,6 @@ volumes:
   postgres_data:
   mongo_data:
   ollama_data:
-  es_data:
   prometheus_data: # 🔥 Добавили том для метрик
   grafana_data:    # 🔥 Добавили том для дашбордов
 

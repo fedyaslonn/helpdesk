@@ -2,7 +2,7 @@ from django.db import models
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
-from core.models import Category, Priority, SLAParameter, Ticket
+from core.models import Category, KnowledgeBaseArticle, Priority, SLAParameter, Ticket
 
 @receiver(pre_save, sender=Ticket)
 def track_ticket_changes(sender, instance, **kwargs):
@@ -81,3 +81,15 @@ def create_default_sla_for_new_category(sender, instance, created, **kwargs):
         # Сохраняем все подготовленные правила ОДНИМ запросом в БД
         if sla_parameters_to_create:
             SLAParameter.objects.bulk_create(sla_parameters_to_create)
+
+
+@receiver(post_save, sender=KnowledgeBaseArticle)
+def update_kb_search_vector(sender, instance, update_fields=None, **kwargs):
+    """Обновляет tsvector при создании/редактировании статьи БЗ."""
+    if update_fields is not None and set(update_fields).issubset(
+        {"view_count", "helpful_count", "updated_at", "search_vector"}
+    ):
+        return
+    from core.kb.search import refresh_search_vector
+
+    refresh_search_vector(instance.pk)

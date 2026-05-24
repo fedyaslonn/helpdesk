@@ -1,11 +1,11 @@
 from django.core.management.base import BaseCommand
 
-from core.kb.elasticsearch_client import reindex_all_kb_articles
+from core.kb.search import refresh_all_search_vectors
 
 
 class Command(BaseCommand):
-    help = "Переиндексирует все статьи базы знаний в Elasticsearch"
+    help = "Пересобирает tsvector для всех статей базы знаний (PostgreSQL FTS)"
 
     def handle(self, *args, **options):
-        count = reindex_all_kb_articles()
-        self.stdout.write(self.style.SUCCESS(f"Проиндексировано статей: {count}"))
+        count = refresh_all_search_vectors()
+        self.stdout.write(self.style.SUCCESS(f"Обновлено search_vector для статей: {count}"))

@@ -2,6 +2,8 @@ import uuid
 from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVectorField
 from django.core.validators import MinLengthValidator, MinValueValidator, MaxValueValidator
 from django.db import models, transaction
 from django.utils import timezone
@@ -417,6 +419,7 @@ class KnowledgeBaseArticle(TimestampedModel):
     """Таблица 2.10 – База знаний"""
     title = models.CharField(max_length=255, verbose_name=_("Заголовок"))
     content = models.TextField(verbose_name=_("Содержание"))
+    search_vector = SearchVectorField(null=True, editable=False)
     category = models.ForeignKey(
         Category, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="articles", verbose_name=_("Категория")
@@ -434,6 +437,9 @@ class KnowledgeBaseArticle(TimestampedModel):
         verbose_name_plural = _("База знаний")
         db_table = "knowledge_base"
         ordering = ["-updated_at"]
+        indexes = [
+            GinIndex(fields=["search_vector"], name="kb_article_search_gin"),
+        ]
 
     def __str__(self):
         return self.title

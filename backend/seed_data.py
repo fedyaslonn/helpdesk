@@ -160,14 +160,14 @@ def seed():
         defaults={"resolution_type": ResolutionResult.ResolutionType.FIXED, "solution_description": "Выдана новая мышь со склада.", "is_sla_met": True}
     )
 
-    print("Индексация статей БЗ в Elasticsearch...")
+    print("Построение tsvector для статей БЗ...")
     try:
-        from core.kb.elasticsearch_client import reindex_all_kb_articles
+        from core.kb.search import refresh_all_search_vectors
 
-        indexed = reindex_all_kb_articles()
-        print(f"Проиндексировано статей: {indexed}")
+        indexed = refresh_all_search_vectors()
+        print(f"Обновлено search_vector для статей: {indexed}")
     except Exception as e:
-        print(f"Предупреждение: не удалось проиндексировать БЗ в Elasticsearch: {e}")
+        print(f"Предупреждение: не удалось построить search_vector: {e}")
 
     print("\n✅ Готово! База успешно заполнена массивом данных.")
     print("--- ДОСТУПЫ ---")
