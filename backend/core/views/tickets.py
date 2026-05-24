@@ -118,24 +118,33 @@ class TicketViewSet(viewsets.ModelViewSet):
 
         return Response(self.get_serializer(ticket).data)
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrEngineer])
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrEngineer], url_path='auto_assign')
     def auto_assign(self, request, pk=None):
         """Принудительное авто-назначение (по кнопке из интерфейса)"""
-        ticket = self.get_object() # Теперь берем тикет по URL (detail=True)
+        # 🔥 flush=True заставляет Docker мгновенно показать лог
+        print(f"\n[VIEWSET] >>> ЗАПРОС ПРИШЕЛ В auto_assign ДЛЯ ТИКЕТА PK={pk}", flush=True)
+        print(f"[VIEWSET] >>> Пользователь: {request.user.username} (Роль: {request.user.role})", flush=True)
 
-        # Проверяем статус (нельзя авто-назначать закрытые/решенные)
+        try:
+            ticket = self.get_object()
+            print(f"[VIEWSET] >>> Тикет найден: {ticket.ticket_number}, Статус: {ticket.status}", flush=True)
+        except Exception as e:
+            print(f"[VIEWSET] >>> ОШИБКА ПОИСКА ТИКЕТА: {e}", flush=True)
+            raise
+
         if ticket.status in [Ticket.Status.RESOLVED, Ticket.Status.CLOSED]:
+            print("[VIEWSET] >>> ОШИБКА: Попытка назначить закрытый тикет", flush=True)
             return Response(
                 {'error': 'Нельзя назначать инженера на закрытую или решенную заявку'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         with transaction.atomic():
-            # Запускаем логику поиска
+            print("[VIEWSET] >>> Передаю тикет в TicketManager.auto_assign()...", flush=True)
             ticket = Ticket.objects.auto_assign(ticket)
             
-            # 🔥 ГЛАВНАЯ ПРОВЕРКА: Смог ли менеджер кого-то найти?
             if ticket.assigned_engineer:
+                print(f"[VIEWSET] >>> УСПЕХ: Менеджер назначил инженера {ticket.assigned_engineer.user.username}", flush=True)
                 Notification.objects.create(
                     user=ticket.assigned_engineer.user, ticket=ticket,
                     message=f"Вам автоматически назначена заявка {ticket.ticket_number}",
@@ -143,7 +152,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                 )
                 return Response(self.get_serializer(ticket).data)
             else:
-                # Если никто не назначен, бьем тревогу на фронтенд!
+                print("[VIEWSET] >>> ПРОВАЛ: Менеджер вернул тикет без инженера", flush=True)
                 return Response(
                     {'error': 'Нет доступных инженеров (никто не на смене, не на дежурстве или превышены лимиты)'}, 
                     status=status.HTTP_400_BAD_REQUEST

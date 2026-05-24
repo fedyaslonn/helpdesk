@@ -1,5 +1,5 @@
 import { serverApi } from '../contants'
-import { apiClientInstance } from '../api/ApiClient'
+import apiClient, { apiClientInstance } from '../api/ApiClient'
 import { useAuth } from '../auth/AuthContext'
 
 
@@ -21,8 +21,10 @@ export const assignTicket = (ticketId, engineerId) =>
   apiClientInstance.post(`/helpdesk/tickets/${ticketId}/assign/`, { engineer_id: engineerId })
 
 export const autoAssignTicket = (ticketId) => {
-  // Теперь отправляем POST прямо на URL конкретного тикета (без тела запроса)
-  return api.post(`/tickets/${ticketId}/auto_assign/`);
+  // 🔥 ЗАМЕНИЛИ _ НА -
+  const url = `/helpdesk/tickets/${ticketId}/auto_assign/`; 
+  console.log("🚀 Отправляем авто-назначение на URL:", url);
+  return apiClientInstance.post(url);
 };
 
 export const closeTicket = (ticketId) => 

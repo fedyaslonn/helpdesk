@@ -252,13 +252,54 @@ class TicketManager(models.Manager):
         ).distinct().order_by("active_tickets", "last_ticket_resolved_at")
 
     def auto_assign(self, ticket):
-        """Автоматическое назначение свободного инженера"""
+        """Автоматическое назначение свободного инженера с отладочными принтами"""
         with transaction.atomic():
+            now = timezone.localtime(timezone.now())
+            print(f"\n--- НАЧАЛО АВТО-НАЗНАЧЕНИЯ ДЛЯ ТИКЕТА {ticket.ticket_number} ---")
+            print(f"Текущее время сервера: {now.date()} {now.time()}")
+
+            # 1. Проверяем, есть ли вообще инженеры в базе
+            total_engineers = SupportEngineer.objects.count()
+            print(f"1. Всего инженеров в базе: {total_engineers}")
+
+            # 2. Проверяем, кто на дежурстве (is_on_duty=True)
+            on_duty_engineers = SupportEngineer.objects.filter(user__is_active=True, is_on_duty=True)
+            print(f"2. Активных инженеров с галочкой 'На дежурстве': {on_duty_engineers.count()}")
+
+            # Детальный разбор каждого дежурного инженера
+            for eng in on_duty_engineers:
+                print(f"  -> Проверяем инженера: {eng.user.username} (ID: {eng.id})")
+                
+                # Проверка смен
+                shifts_today = eng.shifts.filter(shift_date=now.date(), is_active=True)
+                if not shifts_today.exists():
+                    print(f"     [X] ОТКЛОНЕН: Нет активной смены на сегодня ({now.date()})")
+                else:
+                    shift = shifts_today.first()
+                    is_time_match = (shift.shift_start <= now.time() <= shift.shift_end) or (shift.shift_start > shift.shift_end)
+                    if not is_time_match:
+                        print(f"     [X] ОТКЛОНЕН: Нерабочее время. Смена с {shift.shift_start} до {shift.shift_end}, а сейчас {now.time()}")
+                    else:
+                        print(f"     [V] Смена подходит ({shift.shift_start} - {shift.shift_end})")
+
+                # Проверка лимитов тикетов
+                active_t_count = eng.assigned_tickets.filter(status__in=['OP', 'IP', 'WR']).count()
+                limit = eng.max_concurrent_tickets
+                if active_t_count >= limit:
+                    print(f"     [X] ОТКЛОНЕН: Превышен лимит заявок. В работе: {active_t_count}, Лимит: {limit}")
+                else:
+                    print(f"     [V] Лимит в норме: В работе {active_t_count} из {limit}")
+
+            # Итоговый запуск штатного метода поиска
             engineers = self.get_active_engineers_on_shift()
+            
             if not engineers.exists():
+                print(f"--- ИТОГ: ПОДХОДЯЩИХ ИНЖЕНЕРОВ НЕ НАЙДЕНО ---\n")
                 return ticket
 
             best_candidate = engineers.first()
+            print(f"--- ИТОГ: НАЗНАЧЕН ИНЖЕНЕР {best_candidate.user.username} ---\n")
+            
             ticket.assigned_engineer = best_candidate
             ticket.status = self.model.Status.IN_PROGRESS
             ticket.save(update_fields=["assigned_engineer", "status", "updated_at"])
