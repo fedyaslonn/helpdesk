@@ -3,9 +3,13 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from core.models import SupportSession, SupportEngineer
+from core.models import SupportSession, SupportEngineer, Ticket
 from core.serializers.support_sessions import SupportSessionSerializer
 from core.permissions import SessionAccessPermission # Тот же пермишен, что мы обсуждали
+
+from rest_framework.exceptions import PermissionDenied
+
+from django.shortcuts import get_object_or_404
 
 class SupportSessionViewSet(viewsets.ModelViewSet):
     """API для управления сессиями поддержки."""

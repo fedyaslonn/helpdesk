@@ -6,7 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db import models, transaction
 from django.utils import timezone
-
+from core.models import Comment
 from core.models import Ticket, SupportEngineer, User, Notification
 from core.serializers.tickets import TicketSerializer
 from core.serializers.comments import PartialUpdateCommentSerializer, GetCommentSerializer, CreateCommentSerializer 

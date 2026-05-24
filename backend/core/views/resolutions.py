@@ -3,7 +3,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 from core.models import ResolutionResult
 from core.serializers.resolutions import ResolutionResultSerializer
 from core.permissions import ResolutionAccessPermission
+from django.db import transaction
 
+from core.models import Notification, Ticket
 from core.tasks import send_ticket_resolved_notification
 
 class ResolutionResultViewSet(viewsets.ModelViewSet):

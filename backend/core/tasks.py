@@ -8,7 +8,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import strip_tags
 from datetime import timedelta
-from core.models import Ticket
+from core.models import Ticket, Notification, ResolutionResult
 
 from django.db import transaction
 
