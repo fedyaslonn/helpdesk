@@ -51,13 +51,9 @@ export default function LoginForm() {
       >
         <Box className="mb-6 text-center">
           <Typography component="span" className="text-3xl" aria-hidden>
-            🛠️
           </Typography>
           <Typography component="h1" variant="h5" fontWeight={700} className="!mt-2">
-            Вход в HelpDesk
-          </Typography>
-          <Typography variant="body2" color="text.secondary" className="!mt-1">
-            Служба поддержки
+            Вход в Службу технической поддержки
           </Typography>
         </Box>
 
