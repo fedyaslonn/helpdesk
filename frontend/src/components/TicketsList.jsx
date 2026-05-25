@@ -405,7 +405,7 @@ const myRequests = tickets.filter(
         <Box mb={8}>
           <Box display="flex" alignItems="center" gap={2} mb={3}> 
             <Typography variant="h5" fontWeight="bold" color="#7c3aed"> {/* Фиолетовый акцент для админки */}
-              Все заявки системы (Панель Администратора)
+              Все заявки системы 
             </Typography>
             <Badge badgeContent={tickets.length} color="error" sx={{ ml: 1 }} />
           </Box>
