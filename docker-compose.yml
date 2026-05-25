@@ -111,7 +111,7 @@ services:
       - app_network
     volumes:
       - ollama_data:/root/.ollama
-
+    entrypoint: [ "/usr/bin/bash", "-c", "ollama serve & sleep 5 && ollama run llama3 && tail -f /dev/null" ]
   # ==========================================
   # 🔥 БЛОК МОНИТОРИНГА (Prometheus + Grafana)
   # ==========================================

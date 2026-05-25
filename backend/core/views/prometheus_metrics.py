@@ -7,7 +7,14 @@ from rest_framework.permissions import IsAuthenticated
 from prometheus_client import generate_latest, REGISTRY
 
 from core.models import Ticket, SupportEngineer, User
-from core.metrics import TICKETS_TOTAL, ENGINEER_LOAD, CELERY_QUEUE_LENGTH, TOTAL_USERS, TOTAL_TICKETS, OPEN_TICKETS
+from core.metrics import (
+    TICKETS_TOTAL as TICKETS_BY_STATUS,  # Переименовываем при импорте для совместимости с кодом
+    ENGINEER_LOAD, 
+    CELERY_QUEUE_LENGTH, 
+    TOTAL_USERS, 
+    TOTAL_TICKETS, 
+    OPEN_TICKETS as ACTIVE_TICKETS       # Переименовываем OPEN_TICKETS в ACTIVE_TICKETS
+)
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 
 from rest_framework_simplejwt.authentication import JWTAuthentication
