@@ -61,7 +61,7 @@ const Header = ({ onMenuClick }) => {
           className="!flex !items-center !gap-2 !font-bold !text-hd-primary !no-underline"
         >
           <span aria-hidden>🛠️</span>
-          HelpDesk
+          Служба технической поддержки
         </Typography>
 
         <Box className="flex-1" />
