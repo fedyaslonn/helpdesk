@@ -26,6 +26,7 @@ import {
   ClassificationRulesPage,
   KBArticleCreate,
   SystemMetrics,
+  GrafanaMetrics, // <-- ДОБАВЛЕН ИМПОРТ НОВОГО КОМПОНЕНТА
 } from './components';
 
 import Layout from './components/Layout/Layout.jsx';
@@ -37,7 +38,7 @@ function App() {
     return (
       <ThemeProvider theme={muiTheme}>
         <CssBaseline />
-        <LoadingState message="Загрузка приложения…" fullScreen />
+        <LoadingState message="Загрузка приложения..." fullScreen />
       </ThemeProvider>
     );
   }
@@ -59,7 +60,11 @@ function App() {
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="priorities" element={<PrioritiesPage />} />
                 <Route path="classification-rules" element={<ClassificationRulesPage />} />
+
+                {/* Существующие метрики API */}
                 <Route path="api/metrics" element={<SystemMetrics />} />
+                {/* <-- ДОБАВЛЕН МАРШРУТ ДЛЯ НОВОГО КОМПОНЕНТА С ГРАФАНОЙ --> */}
+                <Route path="grafana-metrics" element={<GrafanaMetrics />} />
 
                 <Route path="kb-articles">
                   <Route index element={<KBList />} />

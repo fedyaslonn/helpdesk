@@ -140,6 +140,10 @@ services:
       - prometheus
     networks:
       - app_network
+    environment:
+      - GF_SECURITY_ALLOW_EMBEDDING=true # Разрешает встраивание в iframe
+      - GF_AUTH_ANONYMOUS_ENABLED=true   # Разрешает просмотр без авторизации в самой графане
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
 
 volumes:
   app_data:

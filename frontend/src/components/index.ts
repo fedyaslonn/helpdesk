@@ -24,3 +24,4 @@ export { default as PrioritiesPage } from './PrioritiesPage'
 export { default as ClassificationRulesPage } from './ClassificationRulesPage'
 export { default as KBArticleCreate } from './KBArticleCreate'
 export { default as SystemMetrics } from './SystemMetrics'
+export { default as GrafanaMetrics } from './GrafanaMetrics';

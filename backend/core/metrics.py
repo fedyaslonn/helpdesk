@@ -20,3 +20,7 @@ AI_PRIORITY_ASSIGNED = Counter('ai_priority_assigned_total', 'Распредел
 # --- МЕТРИКИ CELERY ---
 CELERY_TASK_STATUS = Counter('celery_task_status_total', 'Статусы выполнения задач Celery', ['task', 'state'])
 CELERY_TASK_EXECUTION_TIME = Histogram('celery_task_execution_time_seconds', 'Время выполнения Celery', ['task'])
+
+TOTAL_USERS = Gauge('helpdesk_total_users', 'Общее количество зарегистрированных пользователей')
+TOTAL_TICKETS = Gauge('helpdesk_total_tickets', 'Общее количество созданных заявок за все время')
+OPEN_TICKETS = Gauge('helpdesk_active_tickets', 'Количество заявок в работе (не закрытых)')
