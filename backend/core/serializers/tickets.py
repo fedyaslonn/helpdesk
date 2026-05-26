@@ -1,370 +1,108 @@
-from datetime import datetime
+from datetime import timedelta
 
-from django.core.validators import MinLengthValidator
 from django.utils import timezone
 from rest_framework import serializers
-
-from core.models import Membership, Organization, Ticket, User
+from core.ai.ticket_classifier import classify_ticket
+from core.models import Priority, Ticket, User, SupportEngineer
 from core.serializers.comments import GetCommentSerializer
-from core.serializers.organizations import GetOrganizationSerializer
-from core.serializers.users import GetUserSerializer
 
 
-class SimpleTicketSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Ticket
-        fields = [
-            "title",
-            "description",
-            "status",
-            "requestor",
-            "assignee",
-            "organization",
-        ]
+class TicketSerializer(serializers.ModelSerializer):
+    comments_count = serializers.SerializerMethodField()
+    is_sla_breached = serializers.SerializerMethodField()
+    
+    # Поля для чтения: отдаем объекты, чтобы React мог рисовать аватарки и проверять ID
+    requestor = serializers.SerializerMethodField(read_only=True)
+    assignee = serializers.SerializerMethodField(read_only=True)
+    organization = serializers.SerializerMethodField(read_only=True) # React ждет organization
+    comments = GetCommentSerializer(many=True, read_only=True) # Вкладываем комменты
 
-
-class CreateTicketSerializer(serializers.ModelSerializer):
-    organization = serializers.PrimaryKeyRelatedField(
-        queryset=Organization.objects.all(),
-        error_messages={
-            "does_not_exist": "Organization does not exist",
-            "required": "Organization field is requeired",
-            "null": "Organization cannot be null",
-        },
-    )
-
-    description = serializers.CharField(
-        validators=[MinLengthValidator(8)],
-        error_messages={
-            "min_length": "Description field must have at least 8 characters"
-        },
-    )
-
-    title = serializers.CharField(
-        validators=[MinLengthValidator(2)],
-        error_messages={"min_length": "Title field must have at least 2 characters"},
+    # Поля для записи
+    priority_name = serializers.CharField(source="priority.name", read_only=True)
+    priority = serializers.PrimaryKeyRelatedField(queryset=Priority.objects.all(), required=False, allow_null=True)
+    assigned_engineer = serializers.PrimaryKeyRelatedField(
+        queryset=SupportEngineer.objects.select_related('user'),
+        required=False, allow_null=True,
+        write_only=True # Делаем write_only, так как на чтение отдаем assignee
     )
 
     class Meta:
         model = Ticket
         fields = [
-            "organization",
-            "title",
-            "description",
+            'id', 'ticket_number', 'category', 'organization', 
+            'priority', 'assigned_engineer', 'assignee', 'requestor', 'user',
+            'sla_deadline', 'status', 'description', 'created_at', 'updated_at', 
+            'comments_count', 'is_sla_breached', 'comments',
+            'priority_name',
+        ]
+        read_only_fields = [
+            'id', 'ticket_number', 'sla_deadline', 'user',
+            'created_at', 'updated_at', 'comments_count', 'is_sla_breached'
         ]
 
-    def validate(self, attrs):
-        request = self.context.get("request")
+    # --- Подготовка данных для React ---
+    def get_requestor(self, obj):
+        return {"id": obj.user.id, "username": obj.user.username}
 
-        if not request or not request.user.is_authenticated:
-            raise serializers.ValidationError("User is not authenticated.")
+    def get_assignee(self, obj):
+        if obj.assigned_engineer:
+            return {"id": obj.assigned_engineer.user.id, "username": obj.assigned_engineer.user.username}
+        return None
+        
+    def get_organization(self, obj):
+        if obj.category:
+            return {"id": obj.category.id, "name": obj.category.name}
+        return None
 
-        organization = attrs.get("organization")
+    def get_comments_count(self, obj):
+        return obj.comments.count()
 
-        if not organization.is_active:
-            raise serializers.ValidationError(
-                "You cannot assign ticket to inactive organization"
-            )
+    def get_is_sla_breached(self, obj):
+        if not obj.sla_deadline:
+            return False
+            
+        # Если заявка уже решена, сравниваем дедлайн с фактическим временем решения
+        if obj.resolved_at:
+            return obj.resolved_at > obj.sla_deadline
+            
+        # Если заявка всё ещё в работе, сравниваем дедлайн с текущим временем
+        return timezone.now() > obj.sla_deadline
 
-        is_member = Membership.objects.filter(
-            user=request.user, organization=organization, is_active=True
-        ).exists()
+    def validate_assigned_engineer(self, value):
+        if value and value.user.role != User.Role.ENGINEER:
+            raise serializers.ValidationError("Назначенный пользователь должен иметь роль инженера.")
+        return value
 
-        if is_member:
-            raise serializers.ValidationError(
-                "You cannot create tickets for organizations where you are an active member."
-            )
-
-        return attrs
-
-
-class GetTicketSerializer(serializers.ModelSerializer):
-    requestor = GetUserSerializer()
-    assignee = GetUserSerializer(allow_null=True)
-    organization = GetOrganizationSerializer()
-    comments = GetCommentSerializer(many=True)
-
-    class Meta:
-        model = Ticket
-        fields = [
-            "id",
-            "requestor",
-            "assignee",
-            "title",
-            "description",
-            "status",
-            "comments",
-            "organization",
-        ]
-
-        extra_kwargs = {field: {"read_only": True} for field in fields}
-
-
-class UpdateTicketSerializer(serializers.ModelSerializer):
-    description = serializers.CharField(
-        required=True,
-        validators=[MinLengthValidator(8)],
-        error_messages={"min_length": "Description must have at least 8 characters"},
-    )
-    title = serializers.CharField(
-        required=True,
-        validators=[MinLengthValidator(2)],
-        error_messages={"min_length": "Title must have at least 2 characters"},
-    )
-
-    class Meta:
-        model = Ticket
-        fields = ["description", "title"]
-
-    def validate(self, attrs):
-        request = self.context.get("request")
-        ticket = self.instance
-
-        if not request or not request.user.is_authenticated:
-            raise serializers.ValidationError("User is not authenticated.")
-
-        if ticket.requestor != request.user:
-            raise serializers.ValidationError(
-                "Only the ticket creator can update this ticket"
-            )
-
-        return attrs
-
-
-class PartialUpdateTicketSerializer(serializers.ModelSerializer):
-    description = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        validators=[MinLengthValidator(8)],
-        error_messages={"min_length": "Description must have at least 8 characters"},
-    )
-    title = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        validators=[MinLengthValidator(2)],
-        error_messages={"min_length": "Title must have at least 2 characters"},
-    )
-
-    resolution_approved = serializers.BooleanField(required=False)
-    status = serializers.ChoiceField(choices=Ticket.Status.choices, required=False)
-
-    class Meta:
-        model = Ticket
-        fields = ["description", "title", "status", "resolution_approved"]
-
-    def validate(self, attrs):
-        request = self.context.get("request")
-        user = request.user
-        ticket = self.instance
-        current_time = timezone.now().date()
-
-        if not user.is_authenticated:
-            raise serializers.ValidationError("User is not authenticated.")
-
-        if "description" in attrs or "title" in attrs:
-            if ticket.requestor != user:
+    def validate_status(self, value):
+        instance = getattr(self, 'instance', None)
+        request = self.context.get('request')
+        
+        if instance:
+            # Логика переходов
+            allowed = {
+                'OP': ['IP', 'WR'], 
+                'IP': ['WR', 'RS'], 
+                'RS': ['OP', 'CL'],
+                'WR': ['IP', 'RS', 'CL'],
+            }
+            if value not in allowed.get(instance.status, []):
                 raise serializers.ValidationError(
-                    "Only the ticket creator can update description or title"
+                    f"Недопустимый переход статуса из {instance.status} в {value}"
                 )
-
-        if "status" in attrs:
-            is_org_admin = Membership.objects.filter(
-                user=user,
-                organization=ticket.organization,
-                role=Membership.Role.ADMIN,
-                is_active=True,
-            ).exists()
-
-            is_assignee = ticket.assignee == user
-
-            if not (is_org_admin or is_assignee):
-                raise serializers.ValidationError(
-                    "Only organization admins or the assignee can change the status"
-                )
-
-            if is_assignee and not is_org_admin:
-                membership = Membership.objects.filter(
-                    user=user, organization=ticket.organization, is_active=True
-                ).first()
-
-                if (
-                    not membership
-                    or not membership.shift_start
-                    or not membership.shift_end
-                ):
+            
+            # 🔥 ГЛАВНАЯ ПРОВЕРКА: Только автор может перевести в "Решена"
+            if value == 'RS' and request:
+                is_author = request.user == instance.user
+                is_admin = request.user.role == request.user.Role.ADMIN
+                
+                if not (is_author or is_admin):
                     raise serializers.ValidationError(
-                        "You must have a defined shift to change the status"
+                        "Только автор заявки может подтвердить решение и перевести её в статус 'Решена'."
                     )
 
-                now = timezone.localtime(timezone.now()).time()
-                shift_start = membership.shift_start
-                shift_end = membership.shift_end
+        return value
 
-                if shift_start <= shift_end:
-                    in_shift = shift_start <= now <= shift_end
-                else:
-                    in_shift = now >= shift_start or now <= shift_end
+    def create(self, validated_data):
+        validated_data['user'] = self.context['request'].user
 
-                if not in_shift:
-                    raise serializers.ValidationError(
-                        "You can only change status during your working shift"
-                    )
-
-            if (
-                attrs["status"] == Ticket.Status.RESOLVED
-                and not ticket.resolution_approved
-            ):
-                raise serializers.ValidationError(
-                    "Cannot resolve ticket without requestor's approval"
-                )
-
-            if (
-                ticket.status == Ticket.Status.RESOLVED
-                and attrs["status"] != Ticket.Status.RESOLVED
-            ):
-                attrs["resolution_approved"] = False
-
-            if attrs["status"] == ticket.status:
-                raise serializers.ValidationError(
-                    {"status": "New statis must be different from old"}
-                )
-
-        if "resolution_approved" in attrs:
-            if ticket.requestor != user:
-                raise serializers.ValidationError(
-                    "Only the ticket creator can change resolution approval"
-                )
-
-            new_approval = attrs["resolution_approved"]
-
-            if ticket.status == Ticket.Status.RESOLVED and not new_approval:
-                raise serializers.ValidationError(
-                    "Cannot revoke approval for resolved tickets"
-                )
-
-            if new_approval and ticket.status != Ticket.Status.RESOLVED:
-                attrs["status"] = Ticket.Status.RESOLVED
-
-        return attrs
-
-
-class ChangeAssigneeSerializer(serializers.ModelSerializer):
-    old_assignee = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(),
-        error_messages={"user": "User does not exist"},
-        required=True,
-    )
-
-    new_assignee = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(),
-        error_messages={"user": "User does not exist"},
-        required=True,
-    )
-
-    class Meta:
-        model = Ticket
-        fields = ["old_assignee", "new_assignee"]
-
-    def validate_old_assignee(self, val):
-        ticket = self.instance
-
-        if ticket.assignee is None:
-            if val is not None:
-                raise serializers.ValidationError(
-                    {
-                        "old_assignee": "Ticket has no assignee but old assignee was provided"
-                    }
-                )
-
-        if ticket.assignee != val:
-            raise serializers.ValidationError(
-                {
-                    "old_assignee": "Provided assignee does not match current ticket assignee"
-                }
-            )
-
-        return val
-
-    def validate_new_assignee(self, val):
-        ticket = self.instance
-
-        try:
-            membership = Membership.objects.get(
-                user=val, organization=ticket.organization, is_active=True
-            )
-        except Membership.DoesNotExist:
-            raise serializers.ValidationError(
-                {
-                    "new_assignee": "User is not an active member of the ticket's organization"
-                }
-            )
-
-        if membership.active_tickets_count >= 3:
-            raise serializers.ValidationError(
-                {
-                    "new_assignee": "User already has 3 or more active tickets and cannot be assigned"
-                }
-            )
-
-        return val
-
-    def validate(self, attrs):
-        if attrs["old_assignee"] == attrs["new_assignee"]:
-            raise serializers.ValidationError(
-                {"new_assignee": "New assignee must be different from old assignee"}
-            )
-
-        return attrs
-
-
-class RemoveAssigneeSerializer(serializers.Serializer):
-    def validate(self, attrs):
-        ticket = self.context.get("ticket")
-
-        if ticket.assignee is None:
-            raise serializers.ValidationError({"assignee": "Ticket has no assignee"})
-
-        return attrs
-
-
-class SetAssigneeSerializer(serializers.ModelSerializer):
-    assignee = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(),
-        error_messages={"user": "User does not exist"},
-        required=True,
-    )
-
-    class Meta:
-        model = Ticket
-        fields = ["assignee"]
-
-    def validate_assignee(self, val):
-        ticket = self.instance
-
-        try:
-            membership = Membership.objects.get(
-                user=val, organization=ticket.organization, is_active=True
-            )
-        except Membership.DoesNotExist:
-            raise serializers.ValidationError(
-                {
-                    "new_assignee": "User is not an active member of the ticket's organization"
-                }
-            )
-
-        if membership.active_tickets_count >= 3:
-            raise serializers.ValidationError(
-                {
-                    "new_assignee": "User already has 3 or more active tickets and cannot be assigned"
-                }
-            )
-
-        return val
-
-    def validate(self, attrs):
-        ticket = self.instance
-
-        if ticket.assignee:
-            raise serializers.ValidationError("Ticket has already been assigned")
-
-        return attrs
+        return super().create(validated_data)

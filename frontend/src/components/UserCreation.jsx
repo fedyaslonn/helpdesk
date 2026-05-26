@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { serverApi } from '../contants'
 import { useAuth } from '../auth/AuthContext';
 import '../styles/SignUpPage.css'
-import { createUser } from '../services/user-management-api';
+import { registerUser } from '../services/user-management-api';
 
 const formReducer = (state, action) => {
   return {
@@ -27,7 +27,7 @@ function CreateUser() {
     e.preventDefault()
 
     try {
-     const response = await createUser(formState)
+     const response = await registerUser(formState)
 
       const { id, email: userEmail, tokens } = response.data
 

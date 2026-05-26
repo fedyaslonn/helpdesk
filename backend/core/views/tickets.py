@@ -1,558 +1,303 @@
-import logging
-
-from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import Exists, F, ObjectDoesNotExist, OuterRef, Prefetch, Q
-from django.shortcuts import get_object_or_404
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets
+from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from rest_framework.settings import api_settings
-
+from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+from django.db import models, transaction
+from django.utils import timezone
+from core.models import Comment
+from core.models import Ticket, SupportEngineer, User, Notification
+from core.serializers.tickets import TicketSerializer
+from core.serializers.comments import PartialUpdateCommentSerializer, GetCommentSerializer, CreateCommentSerializer 
 from core.filters.tickets import TicketFilter
-from core.models import Comment, Membership, Organization, Ticket, User
-from core.serializers.tickets import (
-    ChangeAssigneeSerializer,
-    CreateTicketSerializer,
-    GetTicketSerializer,
-    PartialUpdateTicketSerializer,
-    RemoveAssigneeSerializer,
-    SetAssigneeSerializer,
-    UpdateTicketSerializer,
-)
+from core.permissions import CanInteractWithTicket, IsAdminOrEngineer
+
 from core.tasks import (
-    send_change_assignee_notification,
-    send_change_status_notification,
-    send_remove_assignee_notification,
-    send_resolution_approved_notification,
-    send_set_assignee_notification,
+    send_ticket_created_notification,
+    process_ai_classification_and_assignment,
+    send_change_assignee_notification,      # ← новое
+    send_remove_assignee_notification,      # ← уже есть, проверьте имя
+    send_change_status_notification,        # ← новое
+    send_set_assignee_notification,         # ← новое
+    send_resolution_approved_notification,  # ← новое
 )
 
-logger = logging.getLogger(__name__)
 
-
-class TicketsViewSet(viewsets.ViewSet):
-    filter_backends = (DjangoFilterBackend,)
+class TicketViewSet(viewsets.ModelViewSet):
+    serializer_class = TicketSerializer
+    permission_classes = [CanInteractWithTicket]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = TicketFilter
+    search_fields = ['ticket_number', 'description', 'category__name']
+    ordering_fields = ['created_at', 'sla_deadline', 'status']
+    ordering = ['-created_at']
 
-    def list(self, request):
-        queryset = self.get_queryset()
-        queryset = self.filter_queryset(queryset)
+    def get_permissions(self):
+        if self.action in ['list', 'create']:
+            return [IsAuthenticated()]
+        return super().get_permissions()
 
-        serializer = GetTicketSerializer(queryset, many=True)
+    def get_queryset(self):
+        user = self.request.user
+        qs = Ticket.objects.select_related(
+            'user', 'category', 'assigned_engineer__user'
+        ).prefetch_related('comments__author')
 
-        return Response(serializer.data)
+        if user.role == User.Role.ADMIN:
+            return qs
+        elif user.role == User.Role.ENGINEER:
+            return qs.filter(
+                models.Q(assigned_engineer__user=user) | models.Q(user=user)
+            )
+        else:  # CLIENT
+            return qs.filter(user=user)
 
-    def retrieve(self, request, pk=None):
+    def perform_create(self, serializer):
+        # 🔥 ДОБАВЛЕНО: Транзакция для безопасного создания заявки, уведомлений и запуска Celery
+        with transaction.atomic():
+            ticket = serializer.save(user=self.request.user)
+
+            Notification.objects.create(
+                user=ticket.user, ticket=ticket,
+                message=f"Заявка {ticket.ticket_number} успешно создана",
+                notification_type=Notification.Type.TICKET_CREATED
+            )
+
+            transaction.on_commit(lambda: send_ticket_created_notification.delay(ticket.id))
+            transaction.on_commit(lambda: process_ai_classification_and_assignment.delay(ticket.id))
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrEngineer])
+    def assign(self, request, pk=None):
+        """Ручное назначение инженера на заявку"""
+
+        # 🔥 ДОБАВЛЕНО: Жесткая блокировка для всех, кроме Администратора
+        if request.user.role != User.Role.ADMIN:
+            return Response(
+                {'error': 'Только администратор имеет право назначать и переназначать заявки.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        ticket = self.get_object()
+        engineer_id = request.data.get('engineer_id')
+
+        if not engineer_id:
+            return Response({'error': 'engineer_id обязателен'}, status=status.HTTP_400_BAD_REQUEST)
+
+        engineer = SupportEngineer.objects.select_related('user').filter(
+            models.Q(id=engineer_id) | models.Q(user__id=engineer_id)
+        ).first()
+
+        if not engineer:
+            return Response({'error': 'Инженер не найден'}, status=status.HTTP_404_NOT_FOUND)
+
+        if engineer.user.role != User.Role.ENGINEER:
+            return Response(
+                {'error': 'Назначенный пользователь не является инженером'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        old_assignee_id = ticket.assigned_engineer.user.id if ticket.assigned_engineer else None
+
+        # Блок транзакции оставляем как было
+        with transaction.atomic():
+            ticket.assign_engineer(engineer, assigned_by=request.user)
+
+            Notification.objects.create(
+                user=engineer.user,
+                ticket=ticket,
+                message=f"Вам назначена заявка {ticket.ticket_number}",
+                notification_type=Notification.Type.ASSIGNED
+            )
+
+            transaction.on_commit(
+                lambda: send_change_assignee_notification.delay(
+                    ticket.id, old_assignee_id, engineer.user.id
+                )
+            )
+
+        return Response(self.get_serializer(ticket).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrEngineer], url_path='auto_assign')
+    def auto_assign(self, request, pk=None):
+        """Принудительное авто-назначение (по кнопке из интерфейса)"""
+        # 🔥 flush=True заставляет Docker мгновенно показать лог
+        print(f"\n[VIEWSET] >>> ЗАПРОС ПРИШЕЛ В auto_assign ДЛЯ ТИКЕТА PK={pk}", flush=True)
+        print(f"[VIEWSET] >>> Пользователь: {request.user.username} (Роль: {request.user.role})", flush=True)
+
         try:
-            user = self.request.user
-            ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
-            ).get(pk=pk)
+            ticket = self.get_object()
+            print(f"[VIEWSET] >>> Тикет найден: {ticket.ticket_number}, Статус: {ticket.status}", flush=True)
+        except Exception as e:
+            print(f"[VIEWSET] >>> ОШИБКА ПОИСКА ТИКЕТА: {e}", flush=True)
+            raise
 
-            is_requestor = ticket.requestor == user
-            is_assignee = ticket.assignee == user if ticket.assignee else False
+        if ticket.status in [Ticket.Status.RESOLVED, Ticket.Status.CLOSED]:
+            print("[VIEWSET] >>> ОШИБКА: Попытка назначить закрытый тикет", flush=True)
+            return Response(
+                {'error': 'Нельзя назначать инженера на закрытую или решенную заявку'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-            is_org_admin = Membership.objects.filter(
-                user=user,
-                organization=ticket.organization,
-                role=Membership.Role.ADMIN,
-                is_active=True,
-            ).exists()
-
-            if not (is_requestor or is_assignee or is_org_admin):
+        with transaction.atomic():
+            print("[VIEWSET] >>> Передаю тикет в TicketManager.auto_assign()...", flush=True)
+            ticket = Ticket.objects.auto_assign(ticket)
+            
+            if ticket.assigned_engineer:
+                print(f"[VIEWSET] >>> УСПЕХ: Менеджер назначил инженера {ticket.assigned_engineer.user.username}", flush=True)
+                Notification.objects.create(
+                    user=ticket.assigned_engineer.user, ticket=ticket,
+                    message=f"Вам автоматически назначена заявка {ticket.ticket_number}",
+                    notification_type=Notification.Type.ASSIGNED
+                )
+                return Response(self.get_serializer(ticket).data)
+            else:
+                print("[VIEWSET] >>> ПРОВАЛ: Менеджер вернул тикет без инженера", flush=True)
                 return Response(
-                    {"error": "You don't have permission to view this ticket"},
-                    status=status.HTTP_403_FORBIDDEN,
+                    {'error': 'Нет доступных инженеров (никто не на смене, не на дежурстве или превышены лимиты)'}, 
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
-        except Ticket.DoesNotExist:
-            return Response(
-                {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+    @action(detail=True, methods=['post'], permission_classes=[CanInteractWithTicket])
+    def close(self, request, pk=None):
+        """Закрытие заявки"""
+        ticket = self.get_object()
+        if ticket.status not in [Ticket.Status.RESOLVED, Ticket.Status.WAITING]:
+            return Response({'error': 'Нельзя закрыть заявку в текущем статусе'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = GetTicketSerializer(ticket)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        ticket.status = Ticket.Status.CLOSED
+        ticket.save(update_fields=['status', 'updated_at'])
+        return Response({'status': 'closed', 'message': 'Заявка закрыта'})
 
-    def create(self, request):
-        serializer = CreateTicketSerializer(
-            data=request.data, context={"request": request}
-        )
+    # =======================================================
+    # Блок комментариев
+    # =======================================================
 
-        try:
+    @action(detail=True, methods=['get', 'post'], url_path='comments')
+    def manage_comments(self, request, pk=None):
+        ticket = self.get_object()
+
+        if request.method == 'GET':
+            comments = ticket.comments.select_related('author').order_by('-created_at')
+            serializer = GetCommentSerializer(comments, many=True)
+            return Response(serializer.data)
+
+        if request.method == 'POST':
+            serializer = CreateCommentSerializer(data=request.data, context={'request': request})
             serializer.is_valid(raise_exception=True)
-            validated_data = serializer.validated_data
+            comment = serializer.save(ticket=ticket, author=request.user)
+            return Response(GetCommentSerializer(comment).data, status=status.HTTP_201_CREATED)
 
-            with transaction.atomic():
-                ticket = Ticket(
-                    requestor=request.user,
-                    organization=validated_data.get("organization"),
-                    title=validated_data.get("title"),
-                    description=validated_data.get("description"),
-                    status=Ticket.Status.OPEN,
-                )
-
-                ticket = Ticket.objects.auto_assign(ticket)
-                ticket.save()
-
-                logger.error(f"ticket:{ticket.assignee}")
-
-                ticket = Ticket.objects.select_related(
-                    "requestor", "assignee", "organization"
-                ).get(id=ticket.id)
-
-                if ticket.assignee:
-                    transaction.on_commit(
-                        lambda: send_set_assignee_notification.delay(
-                            ticket.id, ticket.assignee.id
-                        )
-                    )
-
-        except ValidationError as e:
-            return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
-
-        except User.DoesNotExist:
-            return Response(
-                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-
-        except Organization.DoesNotExist:
-            return Response(
-                {"error": "Organization not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        except IntegrityError as e:
-            return Response(
-                {"error": f"Integrity error: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        except DatabaseError as e:
-            return Response(
-                {"error": f"Database error: {str(e)}"},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to create ticket: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        response = GetTicketSerializer(ticket)
-        return Response(response.data, status=status.HTTP_201_CREATED)
-
-    def update(self, request, pk=None):
-        try:
-            ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
-            ).get(pk=pk)
-
-        except ObjectDoesNotExist:
-            return Response(
-                {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-
-        serializer = UpdateTicketSerializer(
-            ticket, data=request.data, partial=False, context={"request": request}
-        )
+    @action(detail=True, methods=['patch', 'delete'], url_path=r'comments/(?P<comment_id>\d+)')
+    def comment_detail(self, request, pk=None, comment_id=None):
+        ticket = self.get_object()
 
         try:
+            comment = ticket.comments.get(id=comment_id)
+        except Comment.DoesNotExist:
+            return Response({"error": "Комментарий не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.method == 'PATCH':
+            serializer = PartialUpdateCommentSerializer(
+                comment, data=request.data, partial=True, context={'request': request}
+            )
             serializer.is_valid(raise_exception=True)
-            validated_data = serializer.validated_data
+            serializer.save()
+            return Response(GetCommentSerializer(comment).data)
 
-            with transaction.atomic():
-                ticket.title = validated_data.get("title")
-                ticket.description = validated_data.get("description")
+        if request.method == 'DELETE':
+            if request.user != comment.author and request.user.role != User.Role.ADMIN:
+                return Response({"error": "Вы не можете удалить этот комментарий"}, status=status.HTTP_403_FORBIDDEN)
 
-                ticket.save()
+            comment.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
-        except ValidationError as e:
-            return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=True, methods=['post'], permission_classes=[CanInteractWithTicket])
+    def approve_resolution(self, request, pk=None):
+        """Подтверждение решения клиентом"""
+        ticket = self.get_object()
 
-        except IntegrityError as e:
+        if request.user != ticket.user and request.user.role != User.Role.ADMIN:
             return Response(
-                {"error": f"Integrity error: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST,
+                {'error': 'Только автор заявки может подтвердить решение.'},
+                status=status.HTTP_403_FORBIDDEN
             )
 
-        except DatabaseError as e:
+        if ticket.status != Ticket.Status.WAITING:
             return Response(
-                {"error": f"Database error: {str(e)}"},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to update ticket: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        response = GetTicketSerializer(ticket)
-        return Response(response.data, status=status.HTTP_200_OK)
-
-    def partial_update(self, request, pk=None):
-        try:
-            ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
-            ).get(pk=pk)
-
-        except ObjectDoesNotExist as e:
-            return Response(
-                {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
+                {'error': 'Заявка не находится в статусе ожидания подтверждения (WR).'},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         old_status = ticket.status
 
-        serializer = PartialUpdateTicketSerializer(
-            ticket, data=request.data, partial=True, context={"request": request}
-        )
+        # 🔥 ДОБАВЛЕНО: Транзакция для обновления статуса, уведомления и 2-х задач Celery
+        with transaction.atomic():
+            ticket.status = Ticket.Status.RESOLVED
+            ticket.save(update_fields=['status', 'updated_at'])
 
-        try:
-            serializer.is_valid(raise_exception=True)
-            validated_data = serializer.validated_data
-
-            with transaction.atomic():
-                for attr, value in validated_data.items():
-                    if attr != "assignee":
-                        setattr(ticket, attr, value)
-                ticket.save()
-
-                new_status = ticket.status
-
-                if (
-                    new_status == Ticket.Status.RESOLVED
-                    and old_status != Ticket.Status.RESOLVED
-                ):
-                    if ticket.assignee:
-                        Membership.objects.filter(
-                            user=ticket.assignee, organization=ticket.organization
-                        ).update(
-                            resolved_tickets_count=F("resolved_tickets_count") + 1,
-                            active_tickets_count=F("active_tickets_count") - 1,
-                        )
-
-                elif (
-                    old_status == Ticket.Status.RESOLVED
-                    and new_status != Ticket.Status.RESOLVED
-                ):
-                    if ticket.assignee:
-                        Membership.objects.filter(
-                            user=ticket.assignee, organization=ticket.organization
-                        ).update(
-                            resolved_tickets_count=F("resolved_tickets_count") - 1,
-                            active_tickets_count=F("active_tickets_count") + 1,
-                        )
-
-                if "status" in validated_data:
-                    transaction.on_commit(
-                        lambda: send_change_status_notification.delay(
-                            ticket.id, old_status, ticket.status
-                        )
-                    )
-
-                if "resolution_approved" in validated_data:
-                    transaction.on_commit(
-                        lambda: send_resolution_approved_notification.delay(ticket.id)
-                    )
-
-        except ValidationError as e:
-            return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
-
-        except IntegrityError as e:
-            return Response(
-                {"error": f"Integrity error: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        except DatabaseError as e:
-            return Response(
-                {"error": f"Database error: {str(e)}"},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to update ticket: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        response = GetTicketSerializer(ticket)
-        return Response(response.data, status=status.HTTP_200_OK)
-
-    def destroy(self, request, pk=None):
-        try:
-            ticket = Ticket.objects.get(pk=pk)
-
-            if not request.user.is_authenticated:
-                return Response(
-                    {"error": "Authentication required"},
-                    status=status.HTTP_401_UNAUTHORIZED,
+            if ticket.assigned_engineer:
+                Notification.objects.create(
+                    user=ticket.assigned_engineer.user, ticket=ticket,
+                    message=f"Пользователь подтвердил решение по заявке {ticket.ticket_number}. Отличная работа!",
+                    notification_type=Notification.Type.STATUS_CHANGED
                 )
 
-            if not ticket.requestor == request.user:
-                return Response(
-                    {"error": "Only requestor can delete its ticket"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            transaction.on_commit(lambda: send_change_status_notification.delay(
+                ticket.id, old_status, Ticket.Status.RESOLVED
+            ))
 
-            ticket.delete()
-            logger.info(f"Ticket {ticket.id} deleted successfully!")
+            transaction.on_commit(lambda: send_resolution_approved_notification.delay(ticket.id))
 
+        return Response({'status': 'resolved', 'message': 'Решение успешно подтверждено'})
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrEngineer])
+    def unassign(self, request, pk=None):
+        """Снятие инженера с заявки (перевод обратно в OPEN)"""
+        ticket = self.get_object()
+
+        if request.user.role != User.Role.ADMIN:
             return Response(
-                {"status": "Ticket deleted successfully!"},
-                status=status.HTTP_204_NO_CONTENT,
+                {'error': 'Только администратор может снимать инженера с заявки'},
+                status=status.HTTP_403_FORBIDDEN
             )
 
-        except ObjectDoesNotExist:
+        if not ticket.assigned_engineer:
             return Response(
-                {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
+                {'error': 'На эту заявку не назначен инженер'},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-        except DatabaseError as e:
-            return Response(
-                {"error": f"Database error: {str(e)}"},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        old_engineer_user = ticket.assigned_engineer.user
+
+        # 🔥 ДОБАВЛЕНО: Транзакция для безопасного снятия и отправки письма
+        with transaction.atomic():
+            ticket.assigned_engineer = None
+            ticket.status = Ticket.Status.OPEN
+            ticket.save(update_fields=['assigned_engineer', 'status', 'updated_at'])
+
+            Notification.objects.create(
+                user=old_engineer_user, ticket=ticket,
+                message=f"Администратор снял вас с выполнения заявки {ticket.ticket_number}.",
+                notification_type=Notification.Type.STATUS_CHANGED
             )
 
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to delete ticket {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            transaction.on_commit(lambda: send_remove_assignee_notification.delay(ticket.id, old_engineer_user.id))
 
-    @action(detail=True, methods=["post"])
-    def change_assignee(self, request, pk=None):
-        try:
-            ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
-            ).get(pk=pk)
+        return Response({'status': 'unassigned', 'message': 'Инженер успешно снят с заявки'})
 
-            if not Membership.objects.filter(
-                user=request.user,
-                organization=ticket.organization,
-                role=Membership.Role.ADMIN,
-                is_active=True,
-            ).exists():
-                return Response(
-                    {"error": "Only organization admins can change assignee"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+    def perform_update(self, serializer):
+        old_ticket = self.get_object()
+        old_assignee_id = old_ticket.assigned_engineer_id
 
-            serializer = ChangeAssigneeSerializer(
-                instance=ticket,
-                data=request.data,
-                partial=False,
-                context={"request": request, "ticket": ticket},
-            )
+        # 🔥 ДОБАВЛЕНО: Транзакция для обновления и отправки письма о ручном назначении
+        with transaction.atomic():
+            ticket = serializer.save()
 
-            try:
-                serializer.is_valid(raise_exception=True)
-                validated_data = serializer.validated_data
-
-            except ValidationError as e:
-                return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
-
-            with transaction.atomic():
-                old_assignee = ticket.assignee
-                if old_assignee:
-                    ticket.assignee = validated_data["new_assignee"]
-
-                    Membership.objects.filter(
-                        user=old_assignee,
-                        organization=ticket.organization,
-                        active_tickets_count__lt=3,
-                    ).update(active_tickets_count=F("active_tickets_count") - 1)
-
-                ticket.save()
-
-                Membership.objects.filter(
-                    user=ticket.assignee,
-                    organization=ticket.organization,
-                    active_tickets_count__lt=3,
-                ).update(active_tickets_count=F("active_tickets_count") + 1)
+            if ticket.assigned_engineer_id and ticket.assigned_engineer_id != old_assignee_id:
+                new_user_id = ticket.assigned_engineer.user_id
 
                 transaction.on_commit(
-                    lambda: send_change_assignee_notification.delay(
-                        ticket.id, old_assignee.id, ticket.assignee.id
-                    )
+                    lambda: send_set_assignee_notification.delay(ticket.id, new_user_id)
                 )
-
-        except Ticket.DoesNotExist:
-            return Response(
-                {"error": "Ticket not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        except IntegrityError as e:
-            return Response(
-                {"error": f"Integrity error: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        except DatabaseError as e:
-            return Response(
-                {"error": f"Database error: {str(e)}"},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to update ticket: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        response = GetTicketSerializer(ticket)
-
-        return Response(data=response.data, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=["post"])
-    def remove_assignee(self, request, pk=None):
-        try:
-            ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
-            ).get(pk=pk)
-
-            if not Membership.objects.filter(
-                user=request.user,
-                organization=ticket.organization,
-                role=Membership.Role.ADMIN,
-                is_active=True,
-            ).exists():
-                return Response(
-                    {"error": "Only organization admins can remove assignee"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            serializer = RemoveAssigneeSerializer(data={}, context={"ticket": ticket})
-
-            old_assignee = ticket.assignee
-
-            try:
-                serializer.is_valid(raise_exception=True)
-                validated_data = serializer.validated_data
-
-            except ValidationError as e:
-                return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
-
-            with transaction.atomic():
-                Membership.objects.filter(
-                    user=old_assignee, organization=ticket.organization
-                ).update(active_tickets_count=F("active_tickets_count") - 1)
-
-                ticket.assignee = None
-                ticket.save()
-
-                transaction.on_commit(
-                    lambda: send_remove_assignee_notification.delay(
-                        ticket.id, old_assignee.id
-                    )
-                )
-
-        except Ticket.DoesNotExist:
-            return Response(
-                {"error": "Ticket not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        response = GetTicketSerializer(ticket)
-        return Response(data=response.data, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=["post"])
-    def set_assignee(self, request, pk=None):
-        try:
-            ticket = Ticket.objects.select_related(
-                "requestor", "assignee", "organization"
-            ).get(pk=pk)
-
-            if not Membership.objects.filter(
-                user=request.user,
-                organization=ticket.organization,
-                role=Membership.Role.ADMIN,
-                is_active=True,
-            ).exists():
-                return Response(
-                    {"error": "Only organization admins can set assignee"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            serializer = SetAssigneeSerializer(ticket, data=request.data)
-
-            try:
-                serializer.is_valid(raise_exception=True)
-                validated_data = serializer.validated_data
-
-            except ValidationError as e:
-                return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
-
-            with transaction.atomic():
-                ticket.assignee = validated_data.get("assignee")
-                Membership.objects.filter(
-                    user=ticket.assignee,
-                    organization=ticket.organization,
-                    active_tickets_count__lt=3,
-                ).update(active_tickets_count=F("active_tickets_count") + 1)
-
-                ticket.save()
-
-                transaction.on_commit(
-                    lambda: send_set_assignee_notification.delay(
-                        ticket.id, ticket.assignee.id
-                    )
-                )
-
-        except Ticket.DoesNotExist:
-            return Response(
-                {"error": "Ticket not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        response = GetTicketSerializer(ticket)
-        return Response(data=response.data, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=["get"])
-    def admin_check(self, request, pk=None):
-        if not request.user.is_authenticated:
-            return Response(
-                {"error": "Authentication required"},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        try:
-            ticket = Ticket.objects.get(pk=pk)
-
-            is_admin = Membership.objects.filter(
-                user_id=request.user.id,
-                organization=ticket.organization.id,
-                role=Membership.Role.ADMIN,
-                is_active=True,
-            ).exists()
-
-            return Response({"is_admin": is_admin})
-
-        except Ticket.DoesNotExist:
-            return Response(
-                {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-
-    def get_queryset(self):
-        user = self.request.user
-        if user.is_authenticated and user.organization:
-            return Ticket.objects.filter(
-                Q(organization=user.organization) | Q(requestor=user)
-            ).select_related("requestor", "assignee", "organization")
-
-        else:
-            return Ticket.objects.filter(requestor=user).select_related(
-                "requestor", "assignee", "organization"
-            )
-
-        return Ticket.objects.none()
-
-    def filter_queryset(self, queryset):
-        for backend in self.filter_backends:
-            queryset = backend().filter_queryset(self.request, queryset, self)
-
-        return queryset

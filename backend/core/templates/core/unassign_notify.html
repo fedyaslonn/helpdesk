@@ -1,12 +1,166 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Task Reassignment</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Снятие с заявки</title>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+        background-color: #f8fafc;
+        color: #334155;
+        line-height: 1.6;
+        padding: 24px;
+    }
+
+    .email-container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Оранжевый градиент для предупреждения о снятии с задачи */
+    .header {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+        padding: 32px 24px;
+        text-align: center;
+        position: relative;
+    }
+
+    .header h2 {
+        font-size: 26px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        letter-spacing: -0.5px;
+    }
+
+    .header p {
+        opacity: 0.9;
+        font-size: 16px;
+        max-width: 80%;
+        margin: 0 auto;
+    }
+
+    .task-card {
+        padding: 32px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .greeting {
+        font-size: 16px;
+        margin-bottom: 24px;
+        color: #1e293b;
+        background: #fffbeb;
+        padding: 16px;
+        border-radius: 12px;
+        border-left: 4px solid #f59e0b;
+    }
+
+    .detail-row {
+        display: flex;
+        margin-bottom: 20px;
+        align-items: flex-start;
+    }
+
+    .detail-icon {
+        background: #fef3c7;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 16px;
+        color: #d97706;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+
+    .detail-content {
+        flex: 1;
+    }
+
+    .detail-label {
+        font-weight: 600;
+        color: #64748b;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+    }
+
+    .detail-value {
+        font-size: 16px;
+        font-weight: 500;
+        color: #1e293b;
+    }
+
+    .footer {
+        text-align: center;
+        padding: 24px 32px;
+        color: #64748b;
+        font-size: 14px;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .footer p {
+        margin-bottom: 12px;
+    }
+</style>
 </head>
 <body>
-    <h2>You've been unassigned from: {{ ticket.title }}</h2>
-    <p>This task has been reassigned to: {{ new_assignee.username }}</p>
-    <p>Organization: {{ ticket.organization.name }}</p>
-    <p>Status: {{ ticket.get_status_display }}</p>
+    <div class="email-container">
+        <div class="header">
+            <h2>Снятие с заявки: {{ ticket.ticket_number }}</h2>
+            <p>Вы больше не являетесь исполнителем по этой задаче</p>
+        </div>
+
+        <div class="task-card">
+            <div class="greeting">
+                Здравствуйте, <strong>{% if old_assignee %}{{ old_assignee.username }}{% else %}{{ engineer_user.username }}{% endif %}</strong>.<br>
+                Администратор или автоматическая система сняли вас с выполнения заявки в категории «{{ ticket.category.name }}». Дальнейшие действия с вашей стороны не требуются.
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-icon">📌</div>
+                <div class="detail-content">
+                    <div class="detail-label">Номер заявки</div>
+                    <div class="detail-value">{{ ticket.ticket_number }}</div>
+                </div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-icon">📁</div>
+                <div class="detail-content">
+                    <div class="detail-label">Категория</div>
+                    <div class="detail-value">{{ ticket.category.name }}</div>
+                </div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-icon">📝</div>
+                <div class="detail-content">
+                    <div class="detail-label">Описание проблемы</div>
+                    <div class="detail-value">{{ ticket.description|truncatewords:20 }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Это автоматическое уведомление от системы Helpdesk.</p>
+            <p>Пожалуйста, не отвечайте на это письмо.</p>
+        </div>
+    </div>
 </body>
 </html>

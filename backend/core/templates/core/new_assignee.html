@@ -1,45 +1,256 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>New Task Assignment</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Назначена новая заявка</title>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+        background-color: #f8fafc;
+        color: #334155;
+        line-height: 1.6;
+        padding: 24px;
+    }
+
+    .email-container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    }
+
+    .header {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        padding: 32px 24px;
+        text-align: center;
+        position: relative;
+    }
+
+    .header h2 {
+        font-size: 26px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        letter-spacing: -0.5px;
+    }
+
+    .header p {
+        opacity: 0.9;
+        font-size: 16px;
+        max-width: 80%;
+        margin: 0 auto;
+    }
+
+    .task-card {
+        padding: 32px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .detail-row {
+        display: flex;
+        margin-bottom: 20px;
+        align-items: flex-start;
+    }
+
+    .detail-icon {
+        background: #d1fae5;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 16px;
+        color: #047857;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+
+    .detail-content {
+        flex: 1;
+    }
+
+    .detail-label {
+        font-weight: 600;
+        color: #64748b;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+    }
+
+    .detail-value {
+        font-size: 16px;
+        font-weight: 500;
+        color: #1e293b;
+    }
+
+    .description-box {
+        background: #ecfdf5;
+        border-radius: 12px;
+        padding: 20px;
+        margin-top: 24px;
+        border-left: 3px solid #10b981;
+    }
+
+    .description-box .detail-label {
+        margin-bottom: 10px;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .status-open, .status-op {
+        background-color: #fef2f2;
+        color: #991b1b;
+    }
+
+    .status-in-progress, .status-ip {
+        background-color: #fef9c3;
+        color: #854d0e;
+    }
+
+    .status-resolved, .status-rs {
+        background-color: #dcfce7;
+        color: #166534;
+    }
+
+    .status-waiting, .status-wr {
+        background-color: #ede9fe;
+        color: #5b21b6;
+    }
+
+    .action-section {
+        padding: 28px 32px;
+        text-align: center;
+    }
+
+    .btn {
+        display: inline-block;
+        background: #10b981;
+        color: white !important;
+        text-decoration: none;
+        padding: 14px 32px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 16px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2);
+    }
+
+    .btn:hover {
+        background: #059669;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .footer {
+        text-align: center;
+        padding: 24px 32px;
+        color: #64748b;
+        font-size: 14px;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .footer p {
+        margin-bottom: 12px;
+    }
+
+    @media (max-width: 600px) {
         .header {
-            background: #d4edda;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            padding: 24px 16px;
         }
-        .task-details {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 4px;
+
+        .header h2 {
+            font-size: 22px;
         }
-        .footer {
-            color: #6c757d;
-            font-size: 0.9em;
-            margin-top: 20px;
+
+        .task-card, .action-section {
+            padding: 24px;
         }
-    </style>
+
+        .detail-row {
+            flex-direction: column;
+        }
+
+        .detail-icon {
+            margin-bottom: 10px;
+        }
+    }
+</style>
 </head>
 <body>
-    <div class="header">
-        <h2>New Task Assigned: {{ ticket.title }}</h2>
-    </div>
+    <div class="email-container">
+        <div class="header">
+            <h2>Назначена новая заявка: {{ ticket.ticket_number }}</h2>
+            <p>Вы были назначены исполнителем по новой задаче в категории «{{ ticket.category.name }}»</p>
+        </div>
 
-    <div class="task-details">
-        <p><strong>Description:</strong> {{ ticket.description }}</p>
-        <p><strong>Status:</strong> {{ ticket.get_status_display }}</p>
-        <p><strong>Organization:</strong> {{ ticket.organization.name }}</p>
-    </div>
+        <div class="task-card">
+            <div class="detail-row">
+                <div class="detail-icon">📌</div>
+                <div class="detail-content">
+                    <div class="detail-label">Номер заявки</div>
+                    <div class="detail-value">{{ ticket.ticket_number }}</div>
+                </div>
+            </div>
 
-    <div class="footer">
-        This is an automated notification. Please do not reply to this email.
+            <div class="detail-row">
+                <div class="detail-icon">📁</div>
+                <div class="detail-content">
+                    <div class="detail-label">Категория</div>
+                    <div class="detail-value">{{ ticket.category.name }}</div>
+                </div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-icon">🚦</div>
+                <div class="detail-content">
+                    <div class="detail-label">Статус</div>
+                    <div class="detail-value">
+                        <span class="status-badge status-{{ ticket.status|lower }}">{{ ticket.get_status_display }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-icon">📅</div>
+                <div class="detail-content">
+                    <div class="detail-label">Дата создания</div>
+                    <div class="detail-value">{{ ticket.created_at|date:"d.m.Y H:i" }}</div>
+                </div>
+            </div>
+
+            <div class="description-box">
+                <div class="detail-label">Описание проблемы</div>
+                <div class="detail-value">{{ ticket.description|truncatewords:40 }}</div>
+            </div>
+        </div>
+
+        <div class="action-section">
+            <a href="http://localhost:3000/helpdesk/tickets/{{ ticket.id }}" class="btn">Открыть заявку</a>
+        </div>
+
+        <div class="footer">
+            <p>Это автоматическое уведомление от системы Helpdesk.</p>
+            <p>Пожалуйста, не отвечайте на это письмо.</p>
+        </div>
     </div>
 </body>
 </html>

@@ -6,6 +6,7 @@ services:
     container_name: hd_app
     restart: unless-stopped
     volumes:
+      - .:/help_desk
       - app_data:/app_data
     ports:
       - "8000:8000"
@@ -16,6 +17,28 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mongo:
+        condition: service_started
+      ollama:
+        condition: service_started
+    networks:
+      app_network:
+        aliases:
+          - hdapp  # 🔥 Тот самый легальный хост для Prometheus (без подчеркиваний)
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend_app
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
     networks:
       - app_network
 
@@ -35,7 +58,8 @@ services:
     networks:
       - app_network
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
+
   celery_worker:
     build: .
     restart: unless-stopped
@@ -50,6 +74,7 @@ services:
         condition: service_healthy
     networks:
       - app_network
+
   redis:
     image: redis:latest
     container_name: redis
@@ -65,10 +90,70 @@ services:
       - app_network
     command: ["redis-server"]
 
+  mongo:
+    image: mongo:7
+    container_name: mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    networks:
+      - app_network
+    volumes:
+      - mongo_data:/data/db
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    networks:
+      - app_network
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: [ "/usr/bin/bash", "-c", "ollama serve & sleep 5 && ollama run llama3 && tail -f /dev/null" ]
+  # ==========================================
+  # 🔥 БЛОК МОНИТОРИНГА (Prometheus + Grafana)
+  # ==========================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml # Файл настроек (должен лежать рядом с docker-compose)
+      - prometheus_data:/prometheus                       # Чтобы история метрик не удалялась
+    ports:
+      - "9090:9090"
+    networks:
+      - app_network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana                     # Чтобы дашборды и пароли не удалялись
+    depends_on:
+      - prometheus
+    networks:
+      - app_network
+    environment:
+      - GF_SECURITY_ALLOW_EMBEDDING=true # Разрешает встраивание в iframe
+      - GF_AUTH_ANONYMOUS_ENABLED=true   # Разрешает просмотр без авторизации в самой графане
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+
 volumes:
   app_data:
   postgres_data:
+  mongo_data:
+  ollama_data:
+  prometheus_data: # 🔥 Добавили том для метрик
+  grafana_data:    # 🔥 Добавили том для дашбордов
 
 networks:
   app_network:
     driver: bridge
+    

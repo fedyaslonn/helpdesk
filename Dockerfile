@@ -2,11 +2,8 @@ FROM python:3.10-slim
 
 WORKDIR /help_desk
 
-COPY pyproject.toml poetry.lock ./
-
-RUN pip install poetry && \
-    poetry config virtualenvs.create false && \
-    poetry install --only main --no-root
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 

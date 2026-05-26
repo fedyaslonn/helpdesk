@@ -1,34 +1,39 @@
-import { Link, useLocation } from 'react-router-dom'
+import React from 'react';
+import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext';
+import { getNavSections } from './navConfig';
 
-const Sidebar = () => {
-  const location = useLocation()
+const SidebarNav = ({ onNavigate }) => {
+  const { user } = useAuth();
+  if (!user) return null;
+
+  const sections = getNavSections(user.role);
 
   return (
-    <aside className="sidebar">
-      <nav className="nav-menu">
-        <ul>
-          <li className={location.pathname.startsWith('/helpdesk') ? 'active' : ''}>
-            <Link to="/helpdesk/tickets">
-              <span className="icon">📋</span>
-              Tickets
-            </Link>
-          </li>
-          <li className={location.pathname.startsWith('/users') ? 'active' : ''}>
-            <Link to="/users">
-              <span className="icon">👥</span>
-              Users
-            </Link>
-          </li>
-          <li className={location.pathname.startsWith('/organizations') ? 'active' : ''}>
-            <Link to="/organizations">
-              <span className="icon">🏢</span>
-              Organizations
-            </Link>
-          </li>
-        </ul>
-      </nav>
-    </aside>
-  )
-}
+    <nav className="flex flex-col py-2">
+      {sections.map((section) => (
+        <div key={section.title} className="mb-2">
+          <div className="hd-sidebar-section">{section.title}</div>
+          <ul className="flex flex-col gap-0.5 px-2">
+            {section.items.map((item) => (
+              <li key={item.to}>
+                <NavLink
+                  to={item.to}
+                  end={item.end}
+                  onClick={onNavigate}
+                  className={({ isActive }) =>
+                    `hd-sidebar-link ${isActive ? 'hd-sidebar-link-active' : ''}`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  );
+};
 
-export default Sidebar
+export default SidebarNav;

@@ -1,361 +1,233 @@
-import { useEffect, useState } from "react"
-import axios from "axios"
-import "../styles/UsersList.css"
-import { getUsers } from "../services/user-management-api"
-import { serverApi } from "../contants"
-import "../styles/Filters.css"
+import React, { useEffect, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
+import { getUsers, exportUsersExcel, exportUsersWord } from "../services/user-management-api";
 
-const api = axios.create({
-  baseURL: `${serverApi}`,
-  headers: { "Content-Type": "application/json" },
-})
+import { PageLayout, PageHeader, ButtonGroup } from './ui';
+import {
+  Box, Typography, Tabs, Tab, Paper, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow, Avatar, Chip, Button,
+  CircularProgress, Alert, Stack
+} from "@mui/material";
 
-function UsersList() {
-  const [users, setUsers] = useState([])
-  const [error, setError] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [currentUser, setCurrentUser] = useState(null)
+const UsersList = () => {
+  const { user: authUser } = useAuth();
+  const isAdmin = authUser?.role === "admin";
 
-  // Filter states
-  const [selectedFilter, setSelectedFilter] = useState("all") // 'all', 'my-org', 'other-orgs', 'no-org'
+  const [users, setUsers] = useState([]);
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const [pagination, setPagination] = useState({ next: null, previous: null, count: 0, current_page: 1 });
+  const [selectedFilter, setSelectedFilter] = useState("all");
 
-  // Filter options
-  const getFilterOptions = () => {
-    const baseOptions = [
-      {
-        value: "all",
-        label: "All Users",
-        className: "filter-all",
-        icon: "👥",
-        description: "Show all users in the system",
-      },
-    ]
+  const filterOptions = [
+    { value: "all", label: "Все" },
+    { value: "admin", label: "Администраторы" },
+    { value: "engineer", label: "Инженеры" },
+    { value: "client", label: "Клиенты" },
+    { value: "verified", label: "Верифицированные" },
+  ];
 
-    if (currentUser?.organization) {
-      baseOptions.push(
-        {
-          value: "my-org",
-          label: `${currentUser.organization.name} Members`,
-          className: "filter-my-org",
-          icon: "🏢",
-          description: `Users from your organization: ${currentUser.organization.name}`,
-        },
-        {
-          value: "other-orgs",
-          label: "Other Organizations",
-          className: "filter-other-orgs",
-          icon: "🏛️",
-          description: "Users from other organizations",
-        },
-      )
-    }
+  const fetchUsers = async (url = null, pageNumber = 1) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      let responseData;
+      
+      if (url) {
+        const response = await fetch(url, {
+          headers: {
+            "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
+            "Content-Type": "application/json",
+          },
+        });
+        responseData = await response.json();
+      } else {
+        const params = {};
+        if (selectedFilter === "verified") params.is_verified = true;
+        else if (selectedFilter !== "all") params.role = selectedFilter;
 
-    baseOptions.push({
-      value: "no-org",
-      label: "Without Organization",
-      className: "filter-no-org",
-      icon: "👤",
-      description: "Users who don't belong to any organization",
-    })
-
-    return baseOptions
-  }
-
-  // Загрузка данных текущего пользователя
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const response = await api.get("/users/me/")
-        setCurrentUser(response.data)
-        // Если у пользователя есть организация, по умолчанию показываем только её членов
-        if (response.data?.organization) {
-          setSelectedFilter("my-org")
-        }
-      } catch (error) {
-        console.error("Failed to load current user", error)
-        setCurrentUser(null)
+        const response = await getUsers(params);
+        responseData = response.data;
       }
+
+      if (responseData.results) {
+        setUsers(responseData.results);
+        setPagination({
+          next: responseData.next,
+          previous: responseData.previous,
+          count: responseData.count,
+          current_page: pageNumber
+        });
+      } else {
+        setUsers(Array.isArray(responseData) ? responseData : []);
+      }
+    } catch (err) {
+      console.error("Ошибка:", err);
+      setError("Не удалось загрузить список пользователей");
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    fetchCurrentUser()
-  }, [])
-
-  // Загрузка списка пользователей с фильтрацией
   useEffect(() => {
-    const fetchUsers = () => {
-      setIsLoading(true)
+    fetchUsers(null, 1);
+  }, [selectedFilter]);
 
-      getUsers()
-        .then(({ data }) => {
-          console.log("API Response:", data)
-          setUsers(Array.isArray(data) ? data : [])
-          setError(null)
-        })
-        .catch(() => {
-          setError("Failed to load users")
-        })
-        .finally(() => {
-          setIsLoading(false)
-        })
+  const handleExport = async (format) => {
+    try {
+      const params = {};
+      if (selectedFilter === "verified") params.is_verified = true;
+      else if (selectedFilter !== "all") params.role = selectedFilter;
+
+      const exportFn = format === "excel" ? exportUsersExcel : exportUsersWord;
+      const response = await exportFn(params);
+
+      const extension = format === "excel" ? "xlsx" : "docx";
+      const blob = new Blob([response.data], {
+        type: response.headers["content-type"],
+      });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `users_export.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("Ошибка скачивания:", error);
+      alert("Не удалось скачать файл");
     }
+  };
 
-    fetchUsers()
-  }, [])
-
-  // Фильтрация пользователей на клиенте
-  const getFilteredUsers = () => {
-    if (!Array.isArray(users)) return []
-
-    switch (selectedFilter) {
-      case "my-org":
-        return currentUser?.organization
-          ? users.filter((user) => user.organization?.id === currentUser.organization.id)
-          : []
-
-      case "other-orgs":
-        return currentUser?.organization
-          ? users.filter((user) => user.organization && user.organization.id !== currentUser.organization.id)
-          : users.filter((user) => user.organization)
-
-      case "no-org":
-        return users.filter((user) => !user.organization)
-
-      default: // 'all'
-        return users
-    }
-  }
-
-  const handleFilterChange = (filterValue) => {
-    setSelectedFilter(filterValue)
-  }
-
-  const clearFilter = () => {
-    setSelectedFilter("all")
-  }
-
-  const filteredUsers = getFilteredUsers()
-  const filterOptions = getFilterOptions()
+  const getRoleLabel = (role) => ({ admin: "Администратор", engineer: "Инженер", client: "Клиент" }[role] || role);
+  const getRoleColor = (role) => ({ admin: "error", engineer: "warning", client: "primary" }[role] || "default");
 
   if (error) {
     return (
-      <div className="users-container">
-        <div className="error-message">
-          <div className="error-icon">⚠️</div>
-          <h3>Error Loading Users</h3>
-          <p>{error}</p>
-          <button className="btn btn-primary" onClick={() => window.location.reload()}>
-            Try Again
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (isLoading) {
-    return (
-      <div className="users-container">
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <p>Loading users...</p>
-        </div>
-      </div>
-    )
+      <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 4, px: 3 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+        <Button variant="contained" onClick={() => window.location.reload()}>Обновить</Button>
+      </Box>
+    );
   }
 
   return (
-    <div className="users-container">
-      <div className="page-header">
-        <h1 className="page-title">Users List</h1>
-        {currentUser?.organization && (
-          <div className="header-info">
-            <span className="organization-badge">
-              <svg className="org-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                />
-              </svg>
-              {currentUser.organization.name}
-            </span>
-          </div>
-        )}
-      </div>
+    <PageLayout maxWidth="max-w-6xl">
+      <PageHeader
+        title="Список пользователей"
+        subtitle={`Найдено: ${pagination.count || users.length}`}
+        actions={
+          isAdmin ? (
+            <ButtonGroup>
+              <Button variant="outlined" color="success" onClick={() => handleExport('excel')}>
+                Скачать Excel
+              </Button>
+              <Button variant="outlined" color="info" onClick={() => handleExport('word')}>
+                Скачать Word
+              </Button>
+            </ButtonGroup>
+          ) : null
+        }
+      />
 
-      {/* Enhanced Filters Section */}
-      <div className="filters-section">
-        <div className="filters-header">
-          <div className="filters-title">
-            <svg className="filters-title-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z"
-              />
-            </svg>
-            Filter Users
-            {selectedFilter !== "all" && <span className="active-filters-badge">1 active</span>}
-          </div>
-          {selectedFilter !== "all" && (
-            <button className="clear-filters-btn" onClick={clearFilter}>
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Clear Filter
-            </button>
-          )}
-        </div>
-
-        <div className="filter-group">
-          <div className="filter-group-label">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
-              />
-            </svg>
-            Organization Filter
-          </div>
-          <div className="filter-buttons-container">
-            {filterOptions.map((option) => (
-              <button
-                key={option.value}
-                className={`filter-btn user-filter-btn ${option.className} ${
-                  selectedFilter === option.value ? "selected" : ""
-                }`}
-                onClick={() => handleFilterChange(option.value)}
-                title={option.description}
-              >
-                <span className="filter-icon">{option.icon}</span>
-                {option.label}
-                {selectedFilter === option.value && (
-                  <svg className="close-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Results Summary */}
-      <div className="results-summary">
-        <div className="results-count">
-          <span className="count-number">{filteredUsers.length}</span>
-          <span className="count-text">
-            {filteredUsers.length === 1 ? "user found" : "users found"}
-            {selectedFilter !== "all" && (
-              <span className="filter-applied">
-                {" "}
-                • {filterOptions.find((opt) => opt.value === selectedFilter)?.label}
-              </span>
-            )}
-          </span>
-        </div>
-        {selectedFilter === "my-org" && currentUser?.organization && (
-          <div className="filter-info">
-            <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            Showing members of your organization: <strong>{currentUser.organization.name}</strong>
-          </div>
-        )}
-      </div>
-
-      {/* Users Table */}
-      {filteredUsers.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">
-            {selectedFilter === "my-org"
-              ? "🏢"
-              : selectedFilter === "other-orgs"
-                ? "🏛️"
-                : selectedFilter === "no-org"
-                  ? "👤"
-                  : "👥"}
-          </div>
-          <h3>No Users Found</h3>
-          <p>
-            {selectedFilter === "my-org"
-              ? "No users found in your organization."
-              : selectedFilter === "other-orgs"
-                ? "No users found in other organizations."
-                : selectedFilter === "no-org"
-                  ? "All users belong to organizations."
-                  : "No users found in the system."}
-          </p>
-          {selectedFilter !== "all" && (
-            <button className="btn btn-secondary" onClick={clearFilter}>
-              Show All Users
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="users-table">
-          {filteredUsers.map((user) => (
-            <div key={user.id} className="user-row">
-              <div className="user-info">
-                <div className="avatar">{user.username ? user.username[0].toUpperCase() : "?"}</div>
-                <div className="user-details">
-                  <div className="username">{user.username || "Unknown User"}</div>
-                  <div className="email">{user.email || "No email provided"}</div>
-                </div>
-              </div>
-
-              <div className="organizations">
-                {user.organization ? (
-                  <div className="org-info">
-                    <span
-                      className={`org-tag has-org ${
-                        currentUser?.organization && user.organization.id === currentUser.organization.id
-                          ? "same-org"
-                          : "different-org"
-                      }`}
-                    >
-                      <svg className="org-tag-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                        />
-                      </svg>
-                      {user.organization.name}
-                    </span>
-                    {currentUser?.organization && user.organization.id === currentUser.organization.id && (
-                      <span className="same-org-indicator">Your Organization</span>
-                    )}
-                  </div>
-                ) : (
-                  <span className="org-tag no-org">
-                    <svg className="org-tag-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                      />
-                    </svg>
-                    No organization
-                  </span>
-                )}
-              </div>
-            </div>
+      {/* 3. БЛОК ВКЛАДОК (ФИЛЬТРЫ) */}
+      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 6 }}>
+        <Tabs value={selectedFilter} onChange={(e, val) => setSelectedFilter(val)} variant="scrollable" scrollButtons="auto">
+          {filterOptions.map((opt) => (
+            <Tab key={opt.value} value={opt.value} label={opt.label} sx={{ textTransform: "none", fontWeight: "medium" }} />
           ))}
-        </div>
-      )}
-    </div>
-  )
-}
+        </Tabs>
+      </Box>
 
-export default UsersList
+      {/* 3. КОНТЕНТНАЯ ЧАСТЬ (ЗАГРУЗКА, ПУСТО ИЛИ ТАБЛИЦА) */}
+      {isLoading && users.length === 0 ? (
+        <Box display="flex" flexDirection="column" alignItems="center" py={10}>
+          <CircularProgress size={50} color="primary" />
+        </Box>
+      ) : users.length === 0 ? (
+        <Paper elevation={0} sx={{ p: 6, textAlign: "center", bgcolor: "#f8fafc", borderRadius: 3, border: "1px dashed #cbd5e1" }}>
+          <Typography variant="h6" color="#334155" gutterBottom>Пользователи не найдены</Typography>
+        </Paper>
+      ) : (
+        <>
+          <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, border: "1px solid #e2e8f0" }}>
+            <Table sx={{ minWidth: 800 }}>
+              <TableHead sx={{ bgcolor: "#f8fafc" }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: "bold", color: "#475569", py: 2 }}>Пользователь</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: "#475569", py: 2 }}>Роль</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: "#475569", py: 2 }}>Статус</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: "#475569", py: 2 }}>Дата регистрации</TableCell>
+                  {isAdmin && <TableCell sx={{ fontWeight: "bold", color: "#475569", textAlign: "right", py: 2 }}>Действия</TableCell>}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow key={user.id} hover>
+                    <TableCell sx={{ py: 2 }}>
+                      <Box display="flex" alignItems="center" gap={2}>
+                        <Avatar sx={{ bgcolor: "primary.light" }}>{user.username ? user.username.charAt(0).toUpperCase() : "?"}</Avatar>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight="bold" color="#0f172a">{user.username || "Без имени"}</Typography>
+                          <Typography variant="body2" color="text.secondary">{user.email || "Нет email"}</Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell><Chip label={getRoleLabel(user.role)} color={getRoleColor(user.role)} size="small" /></TableCell>
+                    <TableCell>{user.is_verified ? <Chip label="Верифицирован" color="success" variant="outlined" size="small" /> : <Chip label="Ожидает" color="default" variant="outlined" size="small" />}</TableCell>
+                    <TableCell sx={{ color: "#475569" }}>{user.date_joined ? new Date(user.date_joined).toLocaleDateString("ru-RU") : "—"}</TableCell>
+                    {isAdmin && (
+                      <TableCell align="right">
+                        <Button component={RouterLink} to={`/users/${user.id}`} variant="outlined" size="small">
+                          Профиль
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* 🔥 4. ИДЕАЛЬНО ВЫРОВНЕННАЯ ПАГИНАЦИЯ */}
+          {(pagination.next || pagination.previous) && (
+            <Stack 
+              direction="row" 
+              justifyContent="center" 
+              alignItems="center" 
+              spacing={3} 
+              sx={{ mt: 6 }} // 🔥 Большой отступ от таблицы
+            >
+              <Button 
+                variant="outlined" 
+                disabled={!pagination.previous || isLoading} 
+                onClick={() => fetchUsers(pagination.previous, pagination.current_page - 1)}
+                sx={{ minWidth: 120 }} // 🔥 Фиксированная ширина кнопки для идеальной симметрии
+              >
+                Назад
+              </Button>
+              
+              <Typography variant="body1" color="text.secondary" fontWeight="bold" sx={{ minWidth: 100, textAlign: 'center' }}>
+                Страница {pagination.current_page}
+              </Typography>
+              
+              <Button 
+                variant="outlined" 
+                disabled={!pagination.next || isLoading} 
+                onClick={() => fetchUsers(pagination.next, pagination.current_page + 1)}
+                sx={{ minWidth: 120 }} // 🔥 Такая же фиксированная ширина
+              >
+                Вперёд
+              </Button>
+            </Stack>
+          )}
+        </>
+      )}
+    </PageLayout>
+  );
+};
+
+export default UsersList;

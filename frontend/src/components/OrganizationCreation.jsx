@@ -131,7 +131,7 @@ const CreateOrganization = () => {
       }
 
       setTimeout(() => {
-        navigate("/dashboard")
+        navigate("/organizations/")
       }, 2000)
     } catch (error) {
       setIsLoading(false)

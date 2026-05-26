@@ -1,1052 +1,565 @@
-import { useState, useEffect } from "react"
-import { useParams, useNavigate } from "react-router-dom"
-import { useAuth } from "../auth/AuthContext"
-import { apiClientInstance } from "../api/ApiClient"
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
+import { 
+  getTicketDetails, 
+  deleteTicket, 
+  autoAssignTicket, 
+  assignTicket, 
+  unassignTicket,
+  closeTicket, 
+  updateTicket,
+  getEngineers,
+  approveResolution,
+  getKBSuggest,
+  voteKBArticle
+} from "../services/ticket-management-api";
+
+import TicketResolution from "./TicketResolution";
+import TicketSessions from "./TicketSessions";
+import TicketComments from "./TicketComments";
+import { PageLayout, ButtonGroup } from "./ui";
+
 import {
-  getMembers,
-  getTicketComments,
-  removeTicketAssignee,
-  updateTicketStatus,
-  addTicketComment,
-  getTicketDetails,
-  updateTicketComment,
-} from "../services/ticket-management-api.jsx"
-import "../styles/TicketDetails.css"
-import "../styles/Comments.css"
+  Box,
+  Typography,
+  Button,
+  Card,
+  CardContent,
+  Divider,
+  CircularProgress,
+  Chip,
+  TextField,
+  MenuItem,
+  Stack,
+  Alert,
+  Snackbar,
+} from "@mui/material";
+
+const getStatusChip = (status) => {
+  const statusMap = {
+    'OP': { label: 'Открыта', color: 'error' },
+    'IP': { label: 'В работе', color: 'warning' },
+    'WR': { label: 'Ожидание', color: 'info' },
+    'RS': { label: 'Решена', color: 'success' },
+    'CL': { label: 'Закрыта', color: 'default' }
+  };
+  const config = statusMap[status] || { label: status, color: 'default' };
+  
+  return (
+    <Chip 
+      label={config.label} 
+      color={config.color} 
+      sx={{ fontWeight: 'bold', borderRadius: 1.5 }} 
+    />
+  );
+};
 
 const TicketDetail = () => {
-  const { id } = useParams()
-  const navigate = useNavigate()
-  const { user } = useAuth()
-  const [ticket, setTicket] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [isOrgAdmin, setIsOrgAdmin] = useState(false)
-  const [statusUpdateError, setStatusUpdateError] = useState(null)
-  const [statusUpdateSuccess, setStatusUpdateSuccess] = useState(null)
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
-  const [assigneeCandidates, setAssigneeCandidates] = useState([])
-  const [selectedAssignee, setSelectedAssignee] = useState(null)
-  const [isAssigning, setIsAssigning] = useState(false)
-  const [assignError, setAssignError] = useState(null)
-  const [assignSuccess, setAssignSuccess] = useState(null)
-  const [comments, setComments] = useState([])
-  const [isCommentsLoading, setIsCommentsLoading] = useState(false)
-  const [commentsError, setCommentsError] = useState(null)
-  const [newComment, setNewComment] = useState("")
-  const [editingCommentId, setEditingCommentId] = useState(null)
-  const [editingCommentText, setEditingCommentText] = useState("")
-  const [selectedStatus, setSelectedStatus] = useState("")
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
+  
+  const [ticket, setTicket] = useState(null);
+  const [engineers, setEngineers] = useState([]);
+  const [selectedEngineer, setSelectedEngineer] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionError, setActionError] = useState(null);
+  const [kbSuggest, setKbSuggest] = useState(null);
+  const [kbLoading, setKbLoading] = useState(false);
+  const [kbError, setKbError] = useState(null);
+  const [resolutionDraft, setResolutionDraft] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  const handleEditClick = () => {
-    navigate(`/helpdesk/tickets/${id}/update`)
-  }
-
-  const openAssignModal = async () => {
-    setIsAssignModalOpen(true)
-    setAssignError(null)
-    setAssignSuccess(null)
-
-    if (ticket.organization?.id) {
-      await loadAssigneeCandidates()
-    }
-  }
-
-  const loadAssigneeCandidates = async () => {
-    if (!ticket?.organization?.id) {
-      setAssignError("Organization ID is missing")
-      return
-    }
-
+  const loadData = async () => {
+    setIsLoading(true);
     try {
-      const response = await getMembers(ticket.organization.id)
-
-      if (!response.data.length) {
-        setAssignError("No active members found")
-      } else {
-        setAssignError(null)
+      const ticketResp = await getTicketDetails(id);
+      setTicket(ticketResp.data);
+      
+      if (currentUser?.role === 'admin' || currentUser?.role === 'engineer') {
+        const engResp = await getEngineers();
+        setEngineers(engResp.data.results || engResp.data);
       }
-
-      setAssigneeCandidates(response.data)
-      console.log("Assignee candidates:", response.data)
-    } catch (error) {
-      console.error("Failed to load members:", error)
-
-      if (error.response?.status === 403) {
-        setAssignError("Access denied")
-      } else if (error.response?.status === 404) {
-        setAssignError("Organization not found")
-      } else {
-        setAssignError("Loading error. Try again later")
-      }
-    }
-  }
-
-  const handleApprove = async () => {
-    try {
-      setIsUpdating(true)
-      setStatusUpdateError(null)
-      setStatusUpdateSuccess(null)
-
-      const response = await apiClientInstance.patch(`/helpdesk/tickets/${id}/`, { resolution_approved: true })
-
-      setTicket(response.data)
-      setStatusUpdateSuccess("Resolution approved successfully! Ticket has been resolved.")
-
-      setTimeout(() => {
-        setStatusUpdateSuccess(null)
-      }, 5000)
     } catch (err) {
-      console.error("Approval failed:", err)
-
-      let errorMessage = "Failed to approve resolution"
-      if (err.response?.data?.error) {
-        errorMessage = err.response.data.error
-      } else if (err.response?.data?.non_field_errors) {
-        errorMessage = err.response.data.non_field_errors.join(", ")
-      } else if (err.response?.status === 400) {
-        errorMessage = "Invalid request. Please check the ticket status."
-      } else if (err.response?.status === 403) {
-        errorMessage = "You don't have permission to approve this resolution."
+      console.error(err);
+      if (err.response?.status === 404 || err.response?.status === 403) {
+        alert("Заявка не найдена или у вас нет доступа");
+        navigate('/helpdesk/tickets');
       }
-
-      setStatusUpdateError(errorMessage)
     } finally {
-      setIsUpdating(false)
+      setIsLoading(false);
     }
-  }
-
-  const handleAssignSave = async () => {
-    try {
-      setIsAssigning(true)
-      setAssignError(null)
-
-      const endpoint = ticket.assignee
-        ? `/helpdesk/tickets/${id}/change_assignee/`
-        : `/helpdesk/tickets/${id}/set_assignee/`
-
-      const requestData = ticket.assignee
-        ? { old_assignee: ticket.assignee.id, new_assignee: selectedAssignee }
-        : { assignee: selectedAssignee }
-
-      const response = await apiClientInstance.post(endpoint, requestData)
-
-      setTicket(response.data)
-      setAssignSuccess("Assignee updated successfully")
-      setTimeout(() => {
-        setIsAssignModalOpen(false)
-        setAssignSuccess(null)
-      }, 1500)
-    } catch (error) {
-      console.error("Failed to assign ticket", error)
-
-      let errorMessage = "Failed to assign ticket"
-      if (error.response) {
-        if (error.response.data?.error) {
-          errorMessage = error.response.data.error
-        } else if (error.response.data?.new_assignee) {
-          errorMessage = error.response.data.new_assignee.join(", ")
-        }
-      }
-
-      setAssignError(errorMessage)
-    } finally {
-      setIsAssigning(false)
-    }
-  }
-
-  const handleRemoveAssignee = async () => {
-    try {
-      setIsAssigning(true)
-      setAssignError(null)
-
-      const response = await removeTicketAssignee(id)
-
-      setTicket(response.data)
-      setAssignSuccess("Assignee removed successfully")
-      setTimeout(() => {
-        setIsAssignModalOpen(false)
-        setAssignSuccess(null)
-      }, 1500)
-    } catch (error) {
-      console.error("Failed to remove assignee", error)
-
-      let errorMessage = "Failed to remove assignee"
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error
-      }
-
-      setAssignError(errorMessage)
-    } finally {
-      setIsAssigning(false)
-    }
-  }
-
-  const fetchComments = async () => {
-    if (!id) return
-
-    try {
-      setIsCommentsLoading(true)
-      setCommentsError(null)
-      const response = await getTicketComments(id)
-      setComments(response.data)
-    } catch (err) {
-      setCommentsError("Failed to load comments")
-      console.error("Error loading comments:", err)
-    } finally {
-      setIsCommentsLoading(false)
-    }
-  }
+  };
 
   useEffect(() => {
-    const fetchTicket = async () => {
+    loadData();
+  }, [id, currentUser]);
+
+  useEffect(() => {
+    const loadSuggest = async () => {
+      if (!ticket) return;
+      const isAdmin = currentUser?.role === 'admin';
+      const isEngineer = currentUser?.role === 'engineer';
+      
+      // 🔥 ИСПРАВЛЕНИЕ 1: Берем ID из assignee и приводим к строке
+      const isAssignee = ticket.assignee && String(ticket.assignee.id) === String(currentUser?.id);
+
+      if (!(isAdmin || (isEngineer && isAssignee))) return;
+
+      setKbLoading(true);
+      setKbError(null);
       try {
-        setIsLoading(true)
-        setError(null)
-
-        const response = await getTicketDetails(id)
-        const ticketData = response.data
-        setTicket(ticketData)
-
-        if (ticketData?.organization?.id) {
-          try {
-            const adminCheckResponse = await apiClientInstance.get(`/helpdesk/tickets/${id}/check_admin/`)
-            setIsOrgAdmin(adminCheckResponse.data.is_admin)
-          } catch (err) {
-            console.error("Error checking admin status:", err)
-            setIsOrgAdmin(false)
-          }
-        } else {
-          setIsOrgAdmin(false)
-        }
-      } catch (err) {
-        console.error("Error loading ticket:", err)
-
-        if (err.response?.status === 404) {
-          setError({
-            type: "not_found",
-            title: "Ticket Not Found",
-            message: "The requested ticket could not be found or you don't have permission to view it.",
-            icon: "🔍",
-          })
-        } else if (err.response?.status === 403) {
-          setError({
-            type: "forbidden",
-            title: "Access Denied",
-            message: "You don't have permission to view this ticket.",
-            icon: "🚫",
-          })
-        } else if (err.response?.status >= 500) {
-          setError({
-            type: "server_error",
-            title: "Server Error",
-            message: "We're experiencing technical difficulties. Please try again later.",
-            icon: "⚠️",
-          })
-        } else {
-          setError({
-            type: "unknown",
-            title: "Error Loading Ticket",
-            message: "Failed to load ticket details. Please try again.",
-            icon: "❌",
-          })
-        }
+        const res = await getKBSuggest(ticket.id);
+        setKbSuggest(res.data);
+      } catch (e) {
+        setKbError(e.response?.data?.detail || 'Не удалось получить подсказки Базы знаний');
       } finally {
-        setIsLoading(false)
+        setKbLoading(false);
+      }
+    };
+    loadSuggest();
+  }, [ticket, currentUser]);
+
+  const showMessage = (message, severity = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const attachTextAsResolution = async (text, articleIdForVote = null) => {
+    setResolutionDraft(text);
+    if (articleIdForVote) {
+      try {
+        await voteKBArticle(articleIdForVote, { helpful: true });
+      } catch (e) {
+        // не блокируем UX
       }
     }
+    showMessage('Текст добавлен в резолюцию');
+  };
 
-    if (id) {
-      fetchTicket()
-    }
-  }, [id, user])
-
-  useEffect(() => {
-    if (ticket && id) {
-      fetchComments()
-    }
-  }, [ticket, id])
-
-  const getStatusConfig = (status) => {
-    const statusMap = {
-      OP: {
-        label: "Open",
-        className: "status-open",
-        icon: "🔴",
-        color: "#dc2626",
-      },
-      IP: {
-        label: "In Progress",
-        className: "status-in-progress",
-        icon: "🟡",
-        color: "#d97706",
-      },
-      RS: {
-        label: "Resolved",
-        className: "status-resolved",
-        icon: "🟢",
-        color: "#16a34a",
-      },
-      WR: {
-        label: "Waiting for Requestor",
-        className: "status-waiting",
-        icon: "🔵",
-        color: "#2563eb",
-      },
-    }
-    return (
-      statusMap[status] || {
-        label: status,
-        className: "status-default",
-        icon: "⚪",
-        color: "#6b7280",
-      }
-    )
-  }
-
-  const getAvailableStatusTransitions = () => {
-    if (!ticket) return []
-    const currentStatus = ticket.status
-    const allStatuses = [
-      { value: "OP", label: "Open", icon: "🔴" },
-      { value: "IP", label: "In Progress", icon: "🟡" },
-      { value: "WR", label: "Waiting for Requestor", icon: "🔵" },
-      { value: "RS", label: "Resolved", icon: "🟢" },
-    ]
-
-    return allStatuses.filter((status) => status.value !== currentStatus)
-  }
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  const handleStatusChange = async (newStatus) => {
+  const handleDelete = async () => {
+    if (!window.confirm("Вы уверены, что хотите удалить заявку НАВСЕГДА?")) return;
     try {
-      setIsUpdating(true)
-      setStatusUpdateError(null)
-
-      await updateTicketStatus(id, newStatus)
-      setTicket((prev) => ({ ...prev, status: newStatus }))
-
-      setStatusUpdateSuccess(`Status changed to ${getStatusConfig(newStatus).label}`)
-      setTimeout(() => setStatusUpdateSuccess(null), 3000)
-
-      setSelectedStatus("")
+      await deleteTicket(id);
+      navigate('/helpdesk/tickets');
     } catch (err) {
-      console.error("Error updating status:", err)
-      let errorMessage = "Failed to update status"
-      if (err.response) {
-        if (err.response.status === 400) {
-          if (err.response.data?.status) {
-            errorMessage = `Status error: ${err.response.data.status.join(", ")}`
-          } else if (err.response.data?.non_field_errors) {
-            errorMessage = err.response.data.non_field_errors.join(", ")
-          }
-        } else if (err.response.status === 403) {
-          errorMessage = "You don't have permission to change the status"
-        }
-      }
-      setStatusUpdateError(errorMessage)
-    } finally {
-      setIsUpdating(false)
+      setActionError("Ошибка при удалении заявки");
     }
-  }
+  };
 
-  const canUpdateTicket = () => {
-    if (!ticket || !user) return false
-    const isAssignee = ticket.assignee?.id === user.id
-    return isAssignee || isOrgAdmin
-  }
-
-  const canEditTicket = () => {
-    if (!ticket || !user) return false
-    return ticket.requestor?.id === user.id
-  }
-
-  const canApproveResolution = () => {
-    if (!ticket || !user) return false
-    return ticket.status === "WR" && ticket.requestor?.id === user.id
-  }
-
-  const handleAddComment = async () => {
-    if (!newComment.trim()) return
-
+  const handleAutoAssign = async () => {
+    setActionError(null);
     try {
-      const response = await addTicketComment(id, newComment)
-
-      setComments([response.data, ...comments])
-      setNewComment("")
+      await autoAssignTicket(id);
+      loadData();
     } catch (err) {
-      console.error("Failed to add comment", err)
-      setCommentsError("Failed to add comment")
+      setActionError(err.response?.data?.error || "Не удалось автоматически назначить инженера");
     }
-  }
+  };
 
-  const handleUpdateComment = async (commentId) => {
-    if (!editingCommentText.trim()) return
-
+  const handleManualAssign = async () => {
+    setActionError(null);
+    if (!selectedEngineer) {
+      setActionError("Выберите инженера из списка");
+      return;
+    }
     try {
-      const response = await updateTicketComment(id, commentId, editingCommentText)
-
-      setComments(comments.map((comment) => (comment.id === commentId ? response.data : comment)))
-      setEditingCommentId(null)
-      setEditingCommentText("")
+      await assignTicket(id, selectedEngineer);
+      loadData();
     } catch (err) {
-      console.error("Failed to update comment", err)
-      setCommentsError("Failed to update comment")
+      setActionError(err.response?.data?.error || "Ошибка при назначении");
     }
-  }
+  };
 
-  const handleDeleteComment = async (commentId) => {
-    if (!window.confirm("Are you sure you want to delete this comment?")) return
-
+  const handleUnassign = async () => {
+    setActionError(null);
+    if (!window.confirm("Снять текущего инженера с заявки? Заявка снова станет Открытой (OP).")) return;
     try {
-      await apiClientInstance.delete(`/helpdesk/tickets/${id}/comments/${commentId}/`)
-      setComments(comments.filter((comment) => comment.id !== commentId))
+      await unassignTicket(id);
+      loadData();
     } catch (err) {
-      console.error("Failed to delete comment", err)
-      setCommentsError("Failed to delete comment")
+      setActionError(err.response?.data?.error || "Ошибка при снятии инженера");
     }
-  }
+  };
 
-  const startEdit = (comment) => {
-    setEditingCommentId(comment.id)
-    setEditingCommentText(comment.text)
-  }
+  const handleStatusChange = async () => {
+    setActionError(null);
+    if (!selectedStatus) return;
+    try {
+      await updateTicket(id, { status: selectedStatus });
+      loadData();
+      setSelectedStatus("");
+    } catch (err) {
+      setActionError(err.response?.data?.non_field_errors?.[0] || "Недопустимый переход статуса");
+    }
+  };
 
-  const cancelEdit = () => {
-    setEditingCommentId(null)
-    setEditingCommentText("")
-  }
+  const handleClose = async () => {
+    setActionError(null);
+    if (!window.confirm("Заявка будет окончательно закрыта и перенесена в архив. Продолжить?")) return;
+    try {
+      await closeTicket(id);
+      loadData();
+    } catch (err) {
+      setActionError(err.response?.data?.error || "Нельзя закрыть заявку в этом статусе");
+    }
+  };
+
+  const handleApproveResolution = async () => {
+    setActionError(null);
+    try {
+      await approveResolution(id);
+      loadData();
+    } catch (err) {
+      setActionError(err.response?.data?.error || "Ошибка при подтверждении решения");
+    }
+  };
 
   if (isLoading) {
     return (
-      <div className="ticket-detail-container">
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <p>Loading ticket details...</p>
-        </div>
-      </div>
-    )
+      <Box display="flex" flexDirection="column" alignItems="center" mt={10}>
+        <CircularProgress color="primary" />
+        <Typography mt={2} color="text.secondary">Загрузка данных...</Typography>
+      </Box>
+    );
   }
 
-  if (error) {
-    return (
-      <div className="ticket-detail-container">
-        <div className="error-message">
-          <div className="error-icon">{error.icon}</div>
-          <h3>{error.title}</h3>
-          <p>{error.message}</p>
-          <div className="error-actions">
-            <button className="btn btn-primary" onClick={() => navigate("/helpdesk/tickets")}>
-              Back to Tickets
-            </button>
-            {error.type !== "not_found" && error.type !== "forbidden" && (
-              <button className="btn btn-secondary" onClick={() => window.location.reload()}>
-                Try Again
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
+  if (!ticket) return null;
 
-  if (!ticket) {
-    return (
-      <div className="ticket-detail-container">
-        <div className="error-message">
-          <div className="error-icon">📋</div>
-          <h3>No Ticket Data</h3>
-          <p>Unable to load ticket information.</p>
-          <button className="btn btn-primary" onClick={() => navigate("/helpdesk/tickets")}>
-            Back to Tickets
-          </button>
-        </div>
-      </div>
-    )
-  }
+  // Логика прав доступа
+  const isAdmin = currentUser?.role === 'admin';
 
-  const statusConfig = getStatusConfig(ticket.status)
+  // 🔥 ИСПРАВЛЕНИЕ 2: Точная проверка через String()
+  const isAuthor = ticket.requestor && String(ticket.requestor.id) === String(currentUser?.id);
+  const isAssignee = ticket.assignee && String(ticket.assignee.id) === String(currentUser?.id);
+
+const canDelete = isAdmin;
+  const canAssign = isAdmin;
+  const canChangeStatus = isAdmin || isAssignee;
+  const canEditDesc = isAuthor;
+  // 🔥 Теперь кнопку закрытия увидит ТОЛЬКО админ
+  const canClose = isAdmin && ['RS', 'WR'].includes(ticket.status);
 
   return (
-    <div className="ticket-detail-container">
-      {isAssignModalOpen && (
-        <div className="modal-overlay">
-          <div className="assign-modal">
-            <div className="modal-header">
-              <h3>Assign Ticket</h3>
-              <button className="close-btn" onClick={() => setIsAssignModalOpen(false)}>
-                &times;
-              </button>
-            </div>
+    <PageLayout maxWidth="max-w-6xl">
+      {actionError && <Alert severity="error" sx={{ mb: 3 }}>{actionError}</Alert>}
 
-            <div className="modal-body">
-              {assignError && <div className="alert alert-danger">{assignError}</div>}
+      <Box className="mb-6 flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <Button variant="outlined" color="inherit" size="small" onClick={() => navigate('/helpdesk/tickets')} className="!self-start">
+          ← Назад к списку
+        </Button>
+        <Typography variant="h4" fontWeight="bold" className="!text-center sm:!flex-1">
+          Заявка {ticket.ticket_number}
+        </Typography>
+        <Box className="hidden w-[100px] sm:block" aria-hidden />
+      </Box>
 
-              {assignSuccess && <div className="alert alert-success">{assignSuccess}</div>}
+      {/* ОСНОВНОЙ КОНТЕНТ */}
+      <Box sx={{
+        display: 'flex',
+        flexDirection: { xs: 'column', md: 'row' },
+        alignItems: 'flex-start',
+        gap: 4
+      }}>
 
-              <div className="form-group">
-                <label>Select Assignee</label>
-                <select
-                  className="form-select"
-                  value={selectedAssignee || ""}
-                  onChange={(e) => setSelectedAssignee(Number(e.target.value))}
-                  disabled={isAssigning}
-                >
-                  <option value="">Select Assignee</option>
-                  {assigneeCandidates.map((member) => (
-                    <option key={member.user.id} value={member.user.id}>
-                      {member.user.username} ({member.role_display})
-                    </option>
-                  ))}
-                </select>
-              </div>
+        {/* ЛЕВАЯ КОЛОНКА */}
+        <Box sx={{ width: { xs: '100%', md: '65%' } }}>
+          <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0' }}>
+            <CardContent sx={{ p: { xs: 3, md: 5 }, '&:last-child': { pb: { xs: 3, md: 5 } } }}>
 
-              <div className="current-assignee">
-                {ticket.assignee && (
-                  <p>
-                    Current assignee: <strong>{ticket.assignee.username}</strong>
-                  </p>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mb: 4 }}>
+                <Box sx={{ flex: '1 1 45%' }}>
+                  <Typography variant="caption" color="text.secondary" fontSize="0.9rem">Автор обращения</Typography>
+                  <Typography variant="body1" fontWeight="bold" fontSize="1.1rem">{ticket.requestor?.username || 'Неизвестно'}</Typography>
+                </Box>
+                <Box sx={{ flex: '1 1 45%' }}>
+                  <Typography variant="caption" color="text.secondary" fontSize="0.9rem">Назначенный инженер</Typography>
+                  <Typography variant="body1" fontWeight="bold" fontSize="1.1rem">
+                    {ticket.assignee?.username || 'Не назначен'}
+                  </Typography>
+                </Box>
+                <Box sx={{ flex: '1 1 100%' }}>
+                  <Typography variant="caption" color="text.secondary" fontSize="0.9rem">Категория проблемы</Typography>
+                  <Typography variant="body1" fontWeight="bold" fontSize="1.1rem">{ticket.organization?.name || ticket.category_name || 'Без категории'}</Typography>
+                </Box>
+              </Box>
+
+              <Divider sx={{ mb: 4 }} />
+
+              <Typography variant="subtitle1" fontWeight="bold" mb={2} color="#334155" textTransform="uppercase">
+                Описание проблемы
+              </Typography>
+              <Typography variant="body1" sx={{
+                whiteSpace: 'pre-wrap', color: '#0f172a', lineHeight: 1.8, fontSize: '1.05rem',
+                bgcolor: '#f8fafc', p: 3, borderRadius: 2, border: '1px solid #e2e8f0'
+              }}>
+                {ticket.description}
+              </Typography>
+
+              <Box sx={{ mt: 5, pt: 3, borderTop: '1px dashed #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box display="flex" alignItems="center" gap={2}>
+                  <Typography variant="subtitle1" fontWeight="bold" color="text.secondary">
+                    Текущий статус:
+                  </Typography>
+                  {getStatusChip(ticket.status)}
+                </Box>
+                {canDelete && (
+                  <Button variant="outlined" color="error" onClick={handleDelete}>
+                    Удалить заявку
+                  </Button>
                 )}
-              </div>
-            </div>
+              </Box>
 
-            <div className="modal-footer">
-              {ticket.assignee && (
-                <button className="btn btn-danger" onClick={handleRemoveAssignee} disabled={isAssigning}>
-                  {isAssigning ? "Removing..." : "Remove Assignee"}
-                </button>
-              )}
+            </CardContent>
+          </Card>
+        </Box>
 
-              <button
-                className="btn btn-primary"
-                onClick={handleAssignSave}
-                disabled={isAssigning || !selectedAssignee}
-              >
-                {isAssigning ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        {/* ПРАВАЯ КОЛОНКА */}
+        <Box sx={{ width: { xs: '100%', md: '35%' }, position: 'sticky', top: 90 }}>
+          <Stack spacing={3}>
 
-      <div className="ticket-header">
-        <div className="header-left">
-          <button className="back-btn" onClick={() => navigate("/helpdesk/tickets")}>
-            <svg className="back-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Tickets
-          </button>
-          <div className="ticket-id">Ticket #{ticket.id}</div>
-        </div>
-        <div className="header-actions">
-          {isOrgAdmin && (
-            <button className="btn btn-primary" onClick={openAssignModal}>
-              <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
-              Assign
-            </button>
-          )}
+            {/* 💡 Возможные решения (KB + Ollama) */}
+            {(isAdmin || isAssignee) && (
+              <Card elevation={0} sx={{ bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+                  <Typography variant="subtitle1" fontWeight="bold" color="#334155" mb={1}>
+                    💡 Возможные решения
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" mb={2}>
+                    Подсказки из Базы знаний и черновик ответа клиенту.
+                  </Typography>
 
-          {canEditTicket() && (
-            <button className="btn btn-secondary" onClick={handleEditClick}>
-              <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                />
-              </svg>
-              Edit
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="ticket-content">
-        <div className="ticket-card main-card">
-          <div className="card-header">
-            <h1 className="ticket-title">{ticket.title}</h1>
-            <div className={`status-badge ${statusConfig.className}`}>
-              <span className="status-icon">{statusConfig.icon}</span>
-              <span className="status-text">{statusConfig.label}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="content-grid">
-          <div className="ticket-card description-card">
-            <div className="card-header">
-              <h3 className="card-title">
-                <svg className="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                Description
-              </h3>
-            </div>
-            <div className="card-content">
-              <p className="description-text">{ticket.description}</p>
-            </div>
-          </div>
-
-          <div className="ticket-card details-card">
-            <div className="card-header">
-              <h3 className="card-title">
-                <svg className="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                Ticket Details
-              </h3>
-            </div>
-            <div className="card-content">
-              <div className="detail-row">
-                <div className="detail-label">
-                  <svg className="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                  Requestor
-                </div>
-                <div className="detail-value">
-                  <div className="user-info">
-                    <div className="user-avatar">{ticket.requestor?.username?.charAt(0).toUpperCase() || "?"}</div>
-                    <span>{ticket.requestor?.username || "Unknown"}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="detail-row">
-                <div className="detail-label">
-                  <svg className="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192L5.636 18.364M12 2.25a9.75 9.75 0 109.75 9.75A9.75 9.75 0 0012 2.25z"
-                    />
-                  </svg>
-                  Assignee
-                </div>
-                <div className="detail-value">
-                  {ticket.assignee ? (
-                    <div className="user-info">
-                      <div className="user-avatar assigned">{ticket.assignee.username.charAt(0).toUpperCase()}</div>
-                      <span>{ticket.assignee.username}</span>
-                    </div>
-                  ) : (
-                    <span className="unassigned">Unassigned</span>
+                  {kbLoading && (
+                    <Box display="flex" alignItems="center" gap={2} py={1}>
+                      <CircularProgress size={18} />
+                      <Typography variant="body2" color="text.secondary">Ищу по Базе знаний…</Typography>
+                    </Box>
                   )}
-                </div>
-              </div>
 
-              <div className="detail-row">
-                <div className="detail-label">
-                  <svg className="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                    />
-                  </svg>
-                  Organization
-                </div>
-                <div className="detail-value">
-                  <span className="organization-name">{ticket.organization?.name || "N/A"}</span>
-                </div>
-              </div>
+                  {kbError && <Alert severity="warning" sx={{ mb: 2 }}>{kbError}</Alert>}
 
-              <div className="detail-row">
-                <div className="detail-label">
-                  <svg className="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  Created
-                </div>
-                <div className="detail-value">
-                  <span className="date-text">{formatDate(ticket.created_at)}</span>
-                </div>
-              </div>
-
-              <div className="detail-row">
-                <div className="detail-label">
-                  <svg className="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                  Last Updated
-                </div>
-                <div className="detail-value">
-                  <span className="date-text">{formatDate(ticket.updated_at)}</span>
-                </div>
-              </div>
-
-              {ticket.resolution_approved !== undefined && (
-                <div className="detail-row">
-                  <div className="detail-label">
-                    <svg className="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Resolution Approved
-                  </div>
-                  <div className="detail-value">
-                    <span className={`approval-status ${ticket.resolution_approved ? "approved" : "pending"}`}>
-                      {ticket.resolution_approved ? "✅ Yes" : "⏳ Pending"}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {canApproveResolution() && (
-          <div className="ticket-card approval-card">
-            <div className="card-header">
-              <h3 className="card-title">
-                <svg className="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Resolution Approval Required
-              </h3>
-            </div>
-            <div className="card-content">
-              {statusUpdateError && <div className="alert alert-danger">{statusUpdateError}</div>}
-              {statusUpdateSuccess && <div className="alert alert-success">{statusUpdateSuccess}</div>}
-
-              <div className="approval-section">
-                <div className="approval-message">
-                  <p>
-                    <strong>The assignee has marked this ticket as resolved.</strong>
-                  </p>
-                  <p>
-                    Please review the resolution and confirm if the issue has been satisfactorily addressed. Approving
-                    will automatically close the ticket.
-                  </p>
-                </div>
-                <div className="approval-actions">
-                  <button className="btn btn-success btn-lg" onClick={handleApprove} disabled={isUpdating}>
-                    {isUpdating ? (
-                      <>
-                        <div className="btn-spinner"></div>
-                        Approving...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Approve Resolution
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {canUpdateTicket() && (
-          <div className="ticket-card actions-card">
-            <div className="card-header">
-              <h3 className="card-title">
-                <svg className="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Quick Actions
-              </h3>
-            </div>
-            <div className="card-content">
-              {statusUpdateError && <div className="alert alert-danger">{statusUpdateError}</div>}
-              {statusUpdateSuccess && <div className="alert alert-success">{statusUpdateSuccess}</div>}
-              <div className="status-dropdown-container">
-                <label htmlFor="statusSelect">Change Status:</label>
-                <select
-                  id="statusSelect"
-                  className="form-select"
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  disabled={isUpdating}
-                >
-                  <option value="">Select new status</option>
-                  {getAvailableStatusTransitions().map((statusOption) => (
-                    <option key={statusOption.value} value={statusOption.value}>
-                      {statusOption.icon} {statusOption.label}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => handleStatusChange(selectedStatus)}
-                  disabled={isUpdating || !selectedStatus}
-                >
-                  {isUpdating ? "Updating..." : "Change Status"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="access-info">
-          <div className="access-reason">
-            <svg
-              className="access-icon"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              style={{ width: "16px", height: "16px" }}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span>
-              You have access to this ticket as{" "}
-              {ticket.requestor?.id === user?.id
-                ? "the requestor (can edit and approve resolution)"
-                : ticket.assignee?.id === user?.id
-                  ? "the assignee (can manage status)"
-                  : isOrgAdmin
-                    ? "an organization administrator (can assign)"
-                    : "a viewer (limited access)"}
-            </span>
-
-            {statusUpdateError && statusUpdateError.includes("permission") && (
-              <div className="access-error">
-                <svg className="error-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-                {statusUpdateError}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="ticket-card comments-card">
-          <div className="card-header">
-            <h3 className="card-title">
-              <svg className="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                />
-              </svg>
-              Comments ({comments.length})
-            </h3>
-          </div>
-
-          <div className="card-content">
-            {commentsError && <div className="alert alert-danger">{commentsError}</div>}
-
-            {user && (
-              <div className="new-comment-form">
-                <div className="comment-input-container">
-                  <div className="comment-author-avatar">{user?.username?.charAt(0).toUpperCase() || "?"}</div>
-                  <div className="comment-input-wrapper">
-                    <textarea
-                      className="comment-input"
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Add a comment..."
-                      rows="3"
-                    />
-                    <div className="comment-actions">
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={handleAddComment}
-                        disabled={!newComment.trim()}
+                  {!kbLoading && kbSuggest?.generated_draft && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                        Черновик от ИИ
+                      </Typography>
+                      <Box sx={{ bgcolor: 'white', border: '1px solid #e2e8f0', borderRadius: 2, p: 2 }}>
+                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                          {kbSuggest.generated_draft}
+                        </Typography>
+                      </Box>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        fullWidth
+                        sx={{ mt: 1.5 }}
+                        onClick={() => attachTextAsResolution(kbSuggest.generated_draft, kbSuggest.top_article_id)}
+                        disableElevation
                       >
-                        <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                          />
-                        </svg>
-                        Add Comment
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                        Прикрепить как решение (ответ ИИ)
+                      </Button>
+                    </Box>
+                  )}
+
+                  {!kbLoading && (kbSuggest?.articles?.length > 0) ? (
+                    <Stack spacing={2}>
+                      {kbSuggest.articles.map((a) => (
+                        <Box
+                          key={a.id}
+                          className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 sm:flex-row sm:items-center"
+                        >
+                          <Box className="min-w-0 flex-1">
+                            <Typography fontWeight={700} variant="body2" title={a.title}>
+                              {a.title}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" className="!mt-1 !block">
+                              {a.category_name ? `${a.category_name} • ` : ''}{a.excerpt}
+                            </Typography>
+                          </Box>
+                          <ButtonGroup>
+                            <Chip label={Math.round((a.score || 0) * 10) / 10} size="small" />
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={() => attachTextAsResolution(a.content, a.id)}
+                            >
+                              Прикрепить
+                            </Button>
+                          </ButtonGroup>
+                        </Box>
+                      ))}
+                    </Stack>
+                  ) : (
+                    !kbLoading && !kbError && (
+                      <Typography variant="body2" color="text.secondary">
+                        Релевантных статей не найдено.
+                      </Typography>
+                    )
+                  )}
+                </CardContent>
+              </Card>
             )}
 
-            <div className="comments-list">
-              {isCommentsLoading ? (
-                <div className="comments-loading">
-                  <div className="spinner"></div>
-                  <span>Loading comments...</span>
-                </div>
-              ) : comments.length === 0 ? (
-                <div className="no-comments">
-                  <div className="no-comments-icon">💬</div>
-                  <p>No comments yet. Be the first to comment!</p>
-                </div>
-              ) : (
-                comments.map((comment) => (
-                  <div key={comment.id} className="comment-item">
-                    <div className="comment-avatar">{comment.author?.username?.charAt(0).toUpperCase() || "?"}</div>
-                    <div className="comment-content">
-                      <div className="comment-header">
-                        <div className="comment-author">
-                          <span className="author-name">{comment.author?.username || "Unknown"}</span>
-                          <span className="comment-date">{formatDate(comment.created_at)}</span>
-                          {comment.created_at !== comment.updated_at && (
-                            <span className="comment-edited">(edited)</span>
-                          )}
-                        </div>
-                        {user && user.id === comment.author?.id && (
-                          <div className="comment-actions-menu">
-                            {editingCommentId === comment.id ? (
-                              <>
-                                <button
-                                  className="comment-action-btn"
-                                  onClick={() => handleUpdateComment(comment.id)}
-                                  disabled={!editingCommentText.trim()}
-                                >
-                                  <svg
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                    style={{ width: "20px", height: "20px" }}
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M5 13l4 4L19 7"
-                                    />
-                                  </svg>
-                                </button>
-                                <button className="comment-action-btn" onClick={cancelEdit}>
-                                  <svg
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                    style={{ width: "20px", height: "20px" }}
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M6 18L18 6M6 6l12 12"
-                                    />
-                                  </svg>
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button className="comment-action-btn" onClick={() => startEdit(comment)}>
-                                  <svg
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                    style={{ width: "20px", height: "20px" }}
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                    />
-                                  </svg>
-                                </button>
-                                <button
-                                  className="comment-action-btn delete"
-                                  onClick={() => handleDeleteComment(comment.id)}
-                                >
-                                  <svg
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                    style={{ width: "20px", height: "20px" }}
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                    />
-                                  </svg>
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className="comment-body">
-                        {editingCommentId === comment.id ? (
-                          <textarea
-                            className="comment-edit-input"
-                            value={editingCommentText}
-                            onChange={(e) => setEditingCommentText(e.target.value)}
-                            rows="3"
-                          />
-                        ) : (
-                          <p className="comment-text">{comment.text}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+            {/* Блок подтверждения решения */}
+              {ticket.status === 'WR' && isAuthor && (
+              <Card elevation={0} sx={{ bgcolor: '#f0fdf4', borderRadius: 2, border: '1px solid #bbf7d0' }}>
+                <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+                  <Typography variant="subtitle1" fontWeight="bold" color="#166534" mb={1}>
+                    Подтверждение решения
+                  </Typography>
+                  <Typography variant="body2" display="block" color="#14532d" mb={3}>
+                    Служба поддержки предложила решение. Пожалуйста, подтвердите, если проблема успешно устранена.
+                  </Typography>
+                  <Button variant="contained" color="success" size="large" fullWidth onClick={handleApproveResolution}>
+                    Подтвердить решение
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
-export default TicketDetail
+            {/* Блок действий автора */}
+            {canEditDesc && (
+              <Card elevation={0} sx={{ bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+                  <Typography variant="subtitle1" fontWeight="bold" color="#334155" mb={2}>
+                    Управление заявкой
+                  </Typography>
+                  <Button variant="outlined" fullWidth size="large" color="primary" onClick={() => navigate(`/helpdesk/tickets/${id}/update`)}>
+                    Редактировать описание
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Блок назначения (Только Админ) */}
+            {canAssign && ticket.status !== 'CL' && (
+              <Card elevation={0} sx={{ bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+                  <Typography variant="subtitle1" fontWeight="bold" color="#334155" mb={3}>
+                    Назначение инженера
+                  </Typography>
+
+                  <Stack spacing={2}>
+                    <Button variant="contained" color="primary" size="large" fullWidth onClick={handleAutoAssign}>
+                      Авто-назначение
+                    </Button>
+                    <TextField
+                      select
+                      size="small"
+                      label="Выбрать вручную"
+                      value={selectedEngineer}
+                      onChange={(e) => setSelectedEngineer(e.target.value)}
+                      fullWidth
+                      sx={{ bgcolor: 'white' }}
+                    >
+                      <MenuItem value=""><em>Не выбран</em></MenuItem>
+                      {engineers.map(eng => (
+                        <MenuItem key={eng.id} value={eng.id}>
+                          {eng.user?.username || eng.username || 'Без имени'}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                    <Button variant="outlined" color="primary" size="large" fullWidth onClick={handleManualAssign} disabled={!selectedEngineer}>
+                      Назначить
+                    </Button>
+                    {/* 🔥 ИСПРАВЛЕНИЕ 3: ticket.assignee вместо ticket.assigned_engineer */}
+                    {ticket.assignee && isAdmin && (
+                      <Button variant="outlined" color="error" size="large" fullWidth onClick={handleUnassign}>
+                        Снять инженера
+                      </Button>
+                    )}
+                  </Stack>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Блок статуса (Админ / Назначенный инженер) */}
+            {canChangeStatus && ticket.status !== 'CL' && (
+              <Card elevation={0} sx={{ bgcolor: '#fffbeb', borderRadius: 2, border: '1px solid #fde68a' }}>
+                <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+                  <Typography variant="subtitle1" fontWeight="bold" color="#92400e" mb={3}>
+                    Изменить статус
+                  </Typography>
+
+                  <Box display="flex" flexDirection="column">
+                    <TextField
+                      select
+                      size="small"
+                      label="Новый статус"
+                      value={selectedStatus}
+                      onChange={(e) => setSelectedStatus(e.target.value)}
+                      fullWidth
+                      sx={{ bgcolor: 'white', mb: 2.5 }}
+                    >
+                      <MenuItem value="OP">Открыта (OP)</MenuItem>
+                      <MenuItem value="IP">В работе (IP)</MenuItem>
+                      <MenuItem value="WR">Ожидание (WR)</MenuItem>
+                      {(isAuthor || isAdmin) && <MenuItem value="RS">Решена (RS)</MenuItem>}
+                    </TextField>
+                    <Button variant="contained" color="warning" size="large" fullWidth onClick={handleStatusChange} disabled={!selectedStatus} disableElevation>
+                      Обновить статус
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Блок закрытия */}
+            {canClose && (
+              <Card elevation={0} sx={{ bgcolor: '#fef2f2', borderRadius: 2, border: '1px solid #fecaca' }}>
+                <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+                  <Typography variant="subtitle1" fontWeight="bold" color="#991b1b" mb={1}>
+                    Закрытие заявки
+                  </Typography>
+                  <Typography variant="body2" display="block" color="#7f1d1d" mb={3}>
+                    Перевести заявку в финальный статус "Закрыта" (Архив).
+                  </Typography>
+                  <Button variant="contained" color="error" size="large" fullWidth onClick={handleClose} disableElevation>
+                    Закрыть окончательно
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+          </Stack>
+        </Box>
+      </Box>
+
+      {/* ДОЧЕРНИЕ КОМПОНЕНТЫ */}
+      <Box mt={5}>
+        <TicketResolution
+          ticketId={ticket.id}
+          externalSolutionDraft={resolutionDraft}
+          onConsumeDraft={() => setResolutionDraft(null)}
+        />
+      </Box>
+      <Box mt={4}>
+        {/* 🔥 ИСПРАВЛЕНИЕ 4: ticket.assignee?.id вместо ticket.assigned_engineer?.id */}
+        <TicketSessions ticketId={ticket.id} assigneeId={ticket.assignee?.id} />
+      </Box>
+      <Box mt={4}>
+        <TicketComments ticketId={ticket.id} />
+      </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3500}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
+    </PageLayout>
+  );
+};
+
+export default TicketDetail;

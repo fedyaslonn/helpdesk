@@ -1,24 +1,15 @@
-import { Navigate, Outlet } from 'react-router-dom'
-import { useAuth } from '../auth'
-import { Spin } from 'antd'
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuth } from '../auth';
+import { LoadingState } from './ui';
 
 const ProtectedRoute = () => {
-  const { user, isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh'
-      }}>
-        <Spin size="large" />
-      </div>
-    )
+    return <LoadingState message="Проверка авторизации…" fullScreen />;
   }
 
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />
-}
+  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
+};
 
-export default ProtectedRoute
+export default ProtectedRoute;

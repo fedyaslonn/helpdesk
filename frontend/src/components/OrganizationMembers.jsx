@@ -1,11 +1,11 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import axios from "axios"
 import UpdateShiftModal from "./ShiftManagement"
 import { apiClientInstance } from '../api/ApiClient'
 import { serverApi } from '../contants'
+import "../styles/OrganizationMembersPage.css"
+import { getMembers } from '../services/ticket-management-api'
+import AdminAssignmentButton from '../components/AdminAssignmentButton'
 
 function OrganizationMembersPage() {
   const { organizationId } = useParams()
@@ -17,14 +17,20 @@ function OrganizationMembersPage() {
   const [showModal, setShowModal] = useState(false)
   const [organizationInfo, setOrganizationInfo] = useState(null)
 
+  const handleEditShift = (membership) => {
+    setSelectedMembership(membership);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setSelectedMembership(null);
+  };
+
   useEffect(() => {
     const fetchMembers = async () => {
       try {
-        const response = await apiClientInstance.get(`${serverApi}/helpdesk/organizations/${organizationId}/members/`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-        })
+        const response = await getMembers(organizationId)
 
         console.log("Members data:", response.data)
         const membersData = Array.isArray(response.data) ? response.data : []
@@ -54,16 +60,19 @@ function OrganizationMembersPage() {
     }
   }, [organizationId])
 
-  const handleEditShift = (membership) => {
-    console.log("Editing shift for membership:", membership)
-    setSelectedMembership(membership)
-    setShowModal(true)
-  }
-
-  const handleCloseModal = () => {
-    setShowModal(false)
-    setSelectedMembership(null)
-  }
+  const handleAdminAssigned = (userId) => {
+    setMembers(prevMembers =>
+      prevMembers.map(member =>
+        member.user.id === userId
+          ? {
+              ...member,
+              role: 'admin',
+              role_display: 'Admin'
+            }
+          : member
+      )
+    );
+  };
 
   const handleShiftUpdate = async (userId, shiftData) => {
     try {
@@ -134,59 +143,71 @@ function OrganizationMembersPage() {
   }
 
   return (
-    <div className="organization-members-container">
-      <div className="header">
-        <div className="header-content">
-          <h2>Organization Members</h2>
+    <div className="members-container">
+      <div className="header-section">
+        <div className="header-left">
+          <h1 className="page-title">Organization Members</h1>
           {organizationInfo && (
-            <div className="organization-info">
+            <div className="organization-info-card">
               <span className="org-name">{organizationInfo.name}</span>
-              <span className="org-id">ID: {organizationInfo.id}</span>
             </div>
           )}
         </div>
+
         <div className="header-actions">
-          <button onClick={() => navigate(-1)} className="btn-back">
+          <button type="button" onClick={() => navigate(-1)} className="btn back-btn">
             ← Back
           </button>
-          <button onClick={() => navigate("/organizations/shift-management")} className="btn-shift-management">
-            Shift Management
+          <button
+            type="button"
+            onClick={() => navigate("/organizations/applications")}
+            className="btn-applications"
+          >
+            Applications
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(`/organizations/${organizationId}/update`)}
+            className="btn-update-org"
+          >
+            Update Organization
           </button>
         </div>
       </div>
 
       {members.length > 0 && (
-        <div className="members-stats">
+        <div className="stats-grid">
           <div className="stat-card">
-            <h4>Total Members</h4>
-            <span className="stat-number">{members.length}</span>
+            <div className="stat-value">{members.length}</div>
+            <div className="stat-label">Total Members</div>
           </div>
           <div className="stat-card">
-            <h4>With Shifts</h4>
-            <span className="stat-number">{members.filter((m) => m.shift_start && m.shift_end).length}</span>
+            <div className="stat-value">{members.filter((m) => m.shift_start && m.shift_end).length}</div>
+            <div className="stat-label">With Shifts</div>
           </div>
           <div className="stat-card">
-            <h4>Without Shifts</h4>
-            <span className="stat-number">{members.filter((m) => !m.shift_start || !m.shift_end).length}</span>
+            <div className="stat-value">{members.filter((m) => !m.shift_start || !m.shift_end).length}</div>
+            <div className="stat-label">Without Shifts</div>
           </div>
           <div className="stat-card">
-            <h4>Admins</h4>
-            <span className="stat-number">{members.filter((m) => m.role === "admin").length}</span>
+            <div className="stat-value">{members.filter((m) => m.role === "admin").length}</div>
+            <div className="stat-label">Admins</div>
           </div>
           <div className="stat-card">
-            <h4>Workers</h4>
-            <span className="stat-number">{members.filter((m) => m.role === "worker").length}</span>
+            <div className="stat-value">{members.filter((m) => m.role === "worker").length}</div>
+            <div className="stat-label">Workers</div>
           </div>
         </div>
       )}
 
       {members.length === 0 ? (
         <div className="empty-state">
+          <div className="empty-icon">👤</div>
           <h3>No members found</h3>
           <p>This organization doesn't have any members yet.</p>
         </div>
       ) : (
-        <div className="table-container">
+        <div className="table-wrapper">
           <table className="members-table">
             <thead>
               <tr>
@@ -202,14 +223,14 @@ function OrganizationMembersPage() {
             </thead>
             <tbody>
               {members.map((membership) => (
-                <tr key={membership.user.id}>
+                <tr key={membership.user.id} className={!membership.is_active ? "inactive-row" : ""}>
                   <td>
-                    <div className="user-cell">
-                      <div className="user-avatar">
+                    <div className="user-info">
+                      <div className="avatar">
                         {membership.user.username ? membership.user.username[0].toUpperCase() : "?"}
                       </div>
                       <div className="user-details">
-                        <div className="username">{getFullName(membership.user)}</div>
+                        <div className="user-name">{getFullName(membership.user)}</div>
                         <div className="user-handle">@{membership.user.username}</div>
                         <div className="user-id">ID: {membership.user.id}</div>
                       </div>
@@ -221,35 +242,47 @@ function OrganizationMembersPage() {
                     </a>
                   </td>
                   <td>
-                    <span className={`role-badge role-${membership.role}`}>{membership.role_display}</span>
+                    <span className={`role-tag ${membership.role}`}>
+                      {membership.role_display}
+                    </span>
                   </td>
                   <td>
-                    <span className={`shift-time ${!membership.shift_start ? "not-set" : ""}`}>
+                    <span className={`shift-indicator ${!membership.shift_start ? "not-set" : ""}`}>
                       {formatTime(membership.shift_start)}
                     </span>
                   </td>
                   <td>
-                    <span className={`shift-time ${!membership.shift_end ? "not-set" : ""}`}>
+                    <span className={`shift-indicator ${!membership.shift_end ? "not-set" : ""}`}>
                       {formatTime(membership.shift_end)}
                     </span>
                   </td>
                   <td>
-                    <span className="last-login">{getLastLogin(membership.user)}</span>
+                    <span className="last-login">
+                      {getLastLogin(membership.user)}
+                    </span>
                   </td>
                   <td>
-                    <span className={`status-badge ${membership.is_active ? "active" : "inactive"}`}>
+                    <div className={`status-indicator ${membership.is_active ? "active" : "inactive"}`}>
+                      <div className="status-dot"></div>
                       {membership.is_active ? "Active" : "Inactive"}
-                    </span>
+                    </div>
                   </td>
                   <td>
                     <button
                       onClick={() => handleEditShift(membership)}
-                      className="btn-edit"
+                      className={`action-btn ${!membership.is_active ? "disabled" : ""}`}
                       disabled={!membership.is_active}
                       title={!membership.is_active ? "Cannot edit inactive member" : "Edit shift"}
                     >
-                      {!membership.is_active ? "🚫" : "✏️"} Edit
+                      <span className="edit-icon">✏️</span> Edit
                     </button>
+                      {membership.role === 'worker' && membership.is_active && (
+                        <AdminAssignmentButton
+                          userId={membership.user.id}
+                          organizationId={organizationId}
+                          onSuccess={handleAdminAssigned}
+                        />
+                      )}
                   </td>
                 </tr>
               ))}
@@ -259,7 +292,11 @@ function OrganizationMembersPage() {
       )}
 
       {showModal && selectedMembership && (
-        <UpdateShiftModal membership={selectedMembership} onClose={handleCloseModal} onSave={handleShiftUpdate} />
+        <UpdateShiftModal
+          membership={selectedMembership}
+          onClose={handleCloseModal}
+          onSave={handleShiftUpdate}
+        />
       )}
     </div>
   )

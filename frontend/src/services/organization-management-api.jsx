@@ -47,3 +47,11 @@ export const getMyApplications = () => {
 export const cancelApplication = (applicationId) => {
   return apiClientInstance.delete(`/helpdesk/applications/${applicationId}/`)
 }
+
+export const getOrganization = (organizationId) => {
+  return apiClientInstance.get(`${serverApi}/helpdesk/organizations/${organizationId}/`);
+}
+
+export const updateOrganization = (organizationId, data) => {
+  return apiClientInstance.patch(`${serverApi}/helpdesk/organizations/${organizationId}/`, data);
+}

@@ -1,89 +1,211 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ticket Resolution Approved</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f9;
-        }
-        .email-container {
-            max-width: 600px;
-            margin: 40px auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
+    <title>Решение заявки подтверждено</title>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+        background-color: #f8fafc;
+        color: #334155;
+        line-height: 1.6;
+        padding: 24px;
+    }
+
+    .email-container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    }
+
+    .header {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        padding: 32px 24px;
+        text-align: center;
+        position: relative;
+    }
+
+    .header h2 {
+        font-size: 26px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        letter-spacing: -0.5px;
+    }
+
+    .header p {
+        opacity: 0.9;
+        font-size: 16px;
+        max-width: 80%;
+        margin: 0 auto;
+    }
+
+    .task-card {
+        padding: 32px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .greeting {
+        font-size: 16px;
+        margin-bottom: 24px;
+        color: #1e293b;
+    }
+
+    .detail-row {
+        display: flex;
+        margin-bottom: 20px;
+        align-items: flex-start;
+    }
+
+    .detail-icon {
+        background: #d1fae5;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 16px;
+        color: #047857;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+
+    .detail-content {
+        flex: 1;
+    }
+
+    .detail-label {
+        font-weight: 600;
+        color: #64748b;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+    }
+
+    .detail-value {
+        font-size: 16px;
+        font-weight: 500;
+        color: #1e293b;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 14px;
+        background-color: #dcfce7;
+        color: #166534;
+    }
+
+    .footer {
+        text-align: center;
+        padding: 24px 32px;
+        color: #64748b;
+        font-size: 14px;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .footer p {
+        margin-bottom: 12px;
+    }
+
+    @media (max-width: 600px) {
         .header {
-            background: #4CAF50;
-            color: white;
-            padding: 20px;
-            text-align: center;
+            padding: 24px 16px;
         }
-        .header h1 {
-            margin: 0;
-            font-size: 24px;
+
+        .header h2 {
+            font-size: 22px;
         }
-        .content {
-            padding: 30px;
+
+        .task-card {
+            padding: 24px;
         }
-        .ticket-info {
-            margin: 20px 0;
+
+        .detail-row {
+            flex-direction: column;
         }
-        .ticket-info div {
-            margin: 10px 0;
+
+        .detail-icon {
+            margin-bottom: 10px;
         }
-        .status-badge {
-            display: inline-block;
-            padding: 8px 16px;
-            background: #4CAF50;
-            color: white;
-            border-radius: 20px;
-            font-weight: bold;
-            margin: 15px 0;
-        }
-        .footer {
-            background: #f1f1f1;
-            padding: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #666;
-        }
-        a {
-            color: #4CAF50;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-    </style>
+    }
+</style>
 </head>
 <body>
     <div class="email-container">
         <div class="header">
-            <h1>Ticket Resolution Approved</h1>
+            <h2>Решение подтверждено ✅</h2>
+            <p>Клиент подтвердил успешное устранение проблемы</p>
         </div>
-        <div class="content">
-            <div class="status-badge">✓ Approved</div>
 
-            <div class="ticket-info">
-                <div><strong>Title:</strong> {{ ticket_title }}</div>
-                <div><strong>Organization:</strong> {{ organization }}</div>
-                <div><strong>Requestor:</strong> {{ requestor_name }}</div>
-                <div><strong>Assignee:</strong> {{ assignee_name }}</div>
-                <div><strong>Approved at:</strong> {{ approval_time }}</div>
+        <div class="task-card">
+            <div class="greeting">
+                Здравствуйте, <strong>{{ assignee_name }}</strong>!<br>
+                Пользователь <strong>{{ requestor_name }}</strong> подтвердил предложенное вами решение. Заявка переведена в финальный статус. Отличная работа!
             </div>
 
-            <p>Dear {{ assignee_name }},</p>
-            <p>The resolution for ticket <strong>{{ ticket_title }}</strong> has been approved by {{ requestor_name }}. This ticket is now marked as resolved in the {{ organization }} organization.</p>
+            <div class="detail-row">
+                <div class="detail-icon">📌</div>
+                <div class="detail-content">
+                    <div class="detail-label">Номер заявки</div>
+                    <div class="detail-value">{{ ticket_title }}</div>
+                </div>
+            </div>
 
-            <p class="footer-text">This is an automated notification. Please do not reply to this email.</p>
+            <div class="detail-row">
+                <div class="detail-icon">📁</div>
+                <div class="detail-content">
+                    <div class="detail-label">Категория</div>
+                    <div class="detail-value">{{ organization }}</div>
+                </div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-icon">👤</div>
+                <div class="detail-content">
+                    <div class="detail-label">Автор заявки</div>
+                    <div class="detail-value">{{ requestor_name }}</div>
+                </div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-icon">🚦</div>
+                <div class="detail-content">
+                    <div class="detail-label">Статус</div>
+                    <div class="detail-value">
+                        <span class="status-badge">Решена (RS)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-icon">🕒</div>
+                <div class="detail-content">
+                    <div class="detail-label">Время подтверждения</div>
+                    <div class="detail-value">{{ approval_time }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Это автоматическое уведомление от системы Helpdesk.</p>
+            <p>Пожалуйста, не отвечайте на это письмо.</p>
         </div>
     </div>
 </body>
